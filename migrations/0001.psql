@@ -11,3 +11,5 @@ CREATE TABLE Task (
   executed_at timestamp NULL,
   time_elapsed interval NULL
 );
+
+CREATE INDEX idx_task_status ON Task(status);
