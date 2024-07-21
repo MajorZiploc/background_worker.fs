@@ -9,6 +9,7 @@
   <ItemGroup>
     <PackageReference Include="Acadian.Dapper.Fs" Version="0.0.12" />
     <PackageReference Include="Acadian.FSharp" Version="1.2.23" />
+    <PackageReference Include="Npgsql" Version="8.0.3" />
   </ItemGroup>
 
   <ItemGroup>
