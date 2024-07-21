@@ -18,18 +18,17 @@ type Task = {
   TimeElasped: TimeSpan option
 }
 
-// TODO: use .environment variables or a json config for these
-let queues = [| "main"; "internal"; "external" |]
-let timeTillNextPollMs = 3000
-let taskCount = 20
+let queues = (Environment.GetEnvironmentVariable "QUEUES").Split ","
+let timeTillNextPollMs = Environment.GetEnvironmentVariable "TIME_TILL_NEXT_POLL_MS" |> int
+let taskCount = Environment.GetEnvironmentVariable "TASK_COUNT" |> int
 
 type Data() =
   member this.getConnStr() =
-    Sql.host "pgsql"
-    |> Sql.database "postgres"
-    |> Sql.username "postgres"
-    |> Sql.password "password"
-    |> Sql.port 5432
+    Sql.host (Environment.GetEnvironmentVariable "PGHOST")
+    |> Sql.database (Environment.GetEnvironmentVariable "PGDATABASE")
+    |> Sql.username (Environment.GetEnvironmentVariable "PGUSER")
+    |> Sql.password (Environment.GetEnvironmentVariable "PGPASSWORD")
+    |> Sql.port (int (Environment.GetEnvironmentVariable "PGPORT"))
     |> Sql.formatConnectionString
 
   member this.getTasks() =
