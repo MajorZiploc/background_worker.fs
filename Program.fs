@@ -16,7 +16,10 @@ type Task = {
   TimeElasped: TimeSpan option
 }
 
+// TODO: use .environment variables or a json config for these
 let queues = [| "main"; "internal"; "external" |]
+let timeTillNextPollMs = 3000
+let taskCount = 20
 
 type Data() =
 
@@ -31,6 +34,7 @@ type Data() =
   member this.getTasks() =
     let parameters = [
         ("@Queues", Sql.stringArray queues)
+        ("@TaskCount", Sql.int taskCount)
     ]
     let sql = $"
       select
@@ -48,7 +52,7 @@ type Data() =
       where
         status = 'QUEUED'
         and queue_name = Any(@Queues)
-      limit 20
+      limit @TaskCount
       ;
     "
     this.getConnStr ()
@@ -90,8 +94,6 @@ type Data() =
     |> Sql.query sql
     |> Sql.parameters parameters
     |> Sql.executeNonQuery
-
-let timeTillNextPollMs = 3000
 
 // Function to process actions from the queue asynchronously
 let rec processQueue () = async {
