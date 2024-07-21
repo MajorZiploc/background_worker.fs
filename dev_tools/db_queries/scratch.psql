@@ -6,6 +6,8 @@ from Task
 --   and executed_at is not null
 ;
 
+-- truncate table Task;
+
 -- INSERT INTO Task (queue_name, type, status, payload, result, program_path, program_type, created_at, executed_at, time_elapsed)
 -- VALUES
 -- (
@@ -25,6 +27,18 @@ from Task
 --   'sync-with-partner1',
 --   'QUEUED',
 --   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
+--   null,
+--   '/Users/manyu/projects/tooling_notes/fs_prac',
+--   'dotnet-cli',
+--   NOW(),
+--   null,
+--   null
+-- ),
+-- (
+--   'internal',
+--   'sync-with-partner1',
+--   'QUEUED',
+--   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
 --   null,
 --   '/Users/manyu/projects/tooling_notes/fs_prac',
 --   'dotnet-cli',
