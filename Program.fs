@@ -62,16 +62,16 @@ type Data() =
       select
         --  = Id
         -- queue_names
-        {nameof x.Type} = type
-        ,{nameof x.Status} = status
+         type
+        , status
         -- ,payload
         -- ,result
-        ,{nameof x.ProgramPath} = program_path
-        ,{nameof x.ProgramType} = program_type
+        , program_path
+        , program_type
         -- , = created_at
         -- , = executed_at
         -- , = time_elapsed
-      from \"Task\"
+      from Task
       ;
     "
     this.getConnStr ()
@@ -79,10 +79,10 @@ type Data() =
     |> Sql.query sql
     |> Sql.execute (fun read ->
         {
-            Type = read.text "Type"
-            Status = read.text "Status"
-            ProgramPath = read.textOrNone "ProgramPath"
-            ProgramType = read.textOrNone "ProgramType"
+            Type = read.text "type"
+            Status = read.text "status"
+            ProgramPath = read.textOrNone "program_path"
+            ProgramType = read.textOrNone "program_type"
             // FirstName = read.int "first_name"
             // LastName = read.textOrNone "last_name" // reading nullable column
         })
