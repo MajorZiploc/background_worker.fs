@@ -4,7 +4,7 @@ open Newtonsoft.Json.Linq
 open Npgsql.FSharp
 
 type Task = {
-  Id: string
+  Id: Guid
   QueueNames: string array
   Type: string
   Status: string
@@ -37,6 +37,7 @@ type Data() =
         , program_type
         , created_at
       from Task
+      where status = 'QUEUED'
       limit 20
       ;
     "
@@ -45,7 +46,7 @@ type Data() =
     |> Sql.query sql
     |> Sql.execute (fun read ->
         {
-            Id = read.text "id"
+            Id = read.uuid "id"
             QueueNames = read.stringArray "queue_names"
             Type = read.text "type"
             Status = read.text "status"
@@ -57,16 +58,22 @@ type Data() =
 
 let timeTillNextPollMs = 3000
 
-let checkDb () = []
-
 // Function to process actions from the queue asynchronously
 let rec processQueue () = async {
+  let data = Data()
   while true do
-    match checkDb () with
-    | f::r ->
+    let tasks = data.getTasks()
+    match tasks |> List.length with
+    | i when i > 0 ->
       printfn "Process queue"
-      do! Async.Sleep(1000)
-    | [] ->
+      let work = tasks |> List.map (fun task -> async {
+          printfn "Processing task %A" task.Id
+          do! Async.Sleep(1000)
+          return 0
+        })
+      let! _ = work |> Async.Sequential
+      do! Async.Sleep(timeTillNextPollMs)
+    | _ ->
       printfn "Nothing in queue"
       do! Async.Sleep(timeTillNextPollMs)
 }
@@ -74,9 +81,9 @@ let rec processQueue () = async {
 let mainAsync _argv = async {
   let data = Data()
   // let! tasks = data.getTasks() |> Async.AwaitTask
-  let tasks = data.getTasks()
-  printfn "%A" tasks
-  // do! processQueue ()
+  // let tasks = data.getTasks()
+  // printfn "%A" tasks
+  do! processQueue ()
   return 0
 }
 
