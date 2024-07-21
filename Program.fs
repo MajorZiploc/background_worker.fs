@@ -12,6 +12,8 @@ type Task = {
   ProgramPath: string option
   ProgramType: string option
   CreatedAt: DateTime
+  ExecutedAt: DateTime option
+  TimeElasped: TimeSpan option
 }
 
 type Data() =
@@ -25,7 +27,6 @@ type Data() =
     |> Sql.formatConnectionString
 
   member this.getTasks() =
-    let x = Unchecked.defaultof<Task>
     let sql = $"
       select
         id
@@ -36,6 +37,8 @@ type Data() =
         , program_path
         , program_type
         , created_at
+        , executed_at
+        , time_elapsed
       from Task
       where status = 'QUEUED'
       limit 20
@@ -54,7 +57,31 @@ type Data() =
             ProgramType = read.textOrNone "program_type"
             Payload = read.textOrNone "payload" |> Option.map JObject.Parse
             CreatedAt = read.dateTime "created_at"
+            ExecutedAt = read.dateTimeOrNone "executed_at"
+            TimeElasped = read.intervalOrNone "time_elapsed"
         })
+
+  member this.updateTask(task: Task) =
+    let parameters = [
+        ("@Id", Sql.uuid task.Id)
+        ("@ExecutedAt", Sql.timestampOrNone task.ExecutedAt)
+        ("@TimeElasped", Sql.intervalOrNone task.TimeElasped)
+        ("@Status", Sql.text task.Status)
+    ]
+    let sql = $"
+      UPDATE Task
+        SET
+          executed_at = @ExecutedAt
+          , time_elapsed = @TimeElasped
+          , status = @Status
+      WHERE id = @Id
+      ;
+    "
+    this.getConnStr ()
+    |> Sql.connect
+    |> Sql.query sql
+    |> Sql.parameters parameters
+    |> Sql.executeNonQuery
 
 let timeTillNextPollMs = 3000
 
@@ -67,8 +94,14 @@ let rec processQueue () = async {
     | i when i > 0 ->
       printfn "Process queue"
       let work = tasks |> List.map (fun task -> async {
+          let executedAt = DateTime.Now
           printfn "Processing task %A" task.Id
+          // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
+          // emulate task running
           do! Async.Sleep(1000)
+          let timeElapsed = DateTime.Now - executedAt
+          let status = "COMPLETED"
+          let n = data.updateTask ({task with ExecutedAt = executedAt |> Option.Some; TimeElasped = timeElapsed |> Option.Some; Status = status})
           return 0
         })
       let! _ = work |> Async.Sequential
@@ -79,8 +112,7 @@ let rec processQueue () = async {
 }
 
 let mainAsync _argv = async {
-  let data = Data()
-  // let! tasks = data.getTasks() |> Async.AwaitTask
+  // let data = Data()
   // let tasks = data.getTasks()
   // printfn "%A" tasks
   do! processQueue ()
