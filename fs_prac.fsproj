@@ -7,14 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Acadian.Dapper.Fs" Version="0.0.12" />
     <PackageReference Include="Acadian.FSharp" Version="1.2.23" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Npgsql" Version="8.0.3" />
     <PackageReference Include="Npgsql.FSharp" Version="5.7.0" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="data.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

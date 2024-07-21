@@ -1,29 +1,20 @@
+open System
 open Acadian.FSharp
-open Acadian.Dapper.Fs
-open FSharp.Control.Tasks.V2.ContextInsensitive
-open Dapper
-open Npgsql
+open Newtonsoft.Json.Linq
 open Npgsql.FSharp
 
 type Task = {
-  // id: string array
-  // QueueNames: string array
+  Id: string
+  QueueNames: string array
   Type: string
   Status: string
-  // Payload: string
-  // Result: string
+  Payload: JObject option
   ProgramPath: string option
   ProgramType: string option
-  // CreatedAt: string
-  // ExecutedAt: string
-  // TimeElapsed: string
+  CreatedAt: DateTime
 }
 
-let connectionString = "Host=127.0.0.1:5432;Database=postgres;Username=postgres;Password=postgres"
-
 type Data() =
-  // member this.getConn() = safeSqlConnection connectionString
-  member this.getConn() = new NpgsqlConnection(connectionString)
 
   member this.getConnStr() =
     Sql.host "pgsql"
@@ -33,45 +24,20 @@ type Data() =
     |> Sql.port 5432
     |> Sql.formatConnectionString
 
-  member this.getTasks() = task {
+  member this.getTasks() =
     let x = Unchecked.defaultof<Task>
     let sql = $"
       select
-        --  = Id
-        -- queue_names
-        {nameof x.Type} = type
-        ,status
-        -- ,payload
-        -- ,result
-        ,{nameof x.ProgramPath} = program_path
-        ,{nameof x.ProgramType} = program_type
-        -- , = created_at
-        -- , = executed_at
-        -- , = time_elapsed
-      from \"Task\"
-      ;
-    "
-    use conn = this.getConn()
-    let! tasks = conn.QueryAsync<Task>(sql) |> Task.map (Option.ofObjForce)
-    return tasks |> Option.map Seq.toList
-  }
-
-  member this.getTasks1() =
-    let x = Unchecked.defaultof<Task>
-    let sql = $"
-      select
-        --  = Id
-        -- queue_names
-         type
+        id
+        , queue_names
+        , type
         , status
-        -- ,payload
-        -- ,result
+        , payload
         , program_path
         , program_type
-        -- , = created_at
-        -- , = executed_at
-        -- , = time_elapsed
+        , created_at
       from Task
+      limit 20
       ;
     "
     this.getConnStr ()
@@ -79,36 +45,15 @@ type Data() =
     |> Sql.query sql
     |> Sql.execute (fun read ->
         {
+            Id = read.text "id"
+            QueueNames = read.stringArray "queue_names"
             Type = read.text "type"
             Status = read.text "status"
             ProgramPath = read.textOrNone "program_path"
             ProgramType = read.textOrNone "program_type"
-            // FirstName = read.int "first_name"
-            // LastName = read.textOrNone "last_name" // reading nullable column
+            Payload = read.textOrNone "payload" |> Option.map JObject.Parse
+            CreatedAt = read.dateTime "created_at"
         })
-
-  // member this.getTasks() = task {
-  //   let x = Unchecked.defaultof<Task>
-  //   let sql = $"
-  //     select
-  //       --  = Id
-  //       -- queue_names
-  //       {nameof x.Type} = type
-  //       ,status
-  //       -- ,payload
-  //       -- ,result
-  //       ,{nameof x.ProgramPath} = program_path
-  //       ,{nameof x.ProgramType} = program_type
-  //       -- , = created_at
-  //       -- , = executed_at
-  //       -- , = time_elapsed
-  //     from Task
-  //     ;
-  //   "
-  //   use conn = this.getConn()
-  //   let! items = conn.QueryAsync<Task>(sql) |> Task.map (Option.ofObjForce)
-  //   return items |> Option.map Seq.toList
-  // }
 
 let timeTillNextPollMs = 3000
 
@@ -128,8 +73,8 @@ let rec processQueue () = async {
 
 let mainAsync _argv = async {
   let data = Data()
-  // let! tasks = data.getTasks1() |> Async.AwaitTask
-  let tasks = data.getTasks1()
+  // let! tasks = data.getTasks() |> Async.AwaitTask
+  let tasks = data.getTasks()
   printfn "%A" tasks
   // do! processQueue ()
   return 0
