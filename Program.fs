@@ -33,8 +33,8 @@ type Data() =
 
   member this.getTasks() =
     let parameters = [
-        ("@Queues", Sql.stringArray queues)
-        ("@TaskCount", Sql.int taskCount)
+      ("@Queues", Sql.stringArray queues)
+      ("@TaskCount", Sql.int taskCount)
     ]
     let sql = $"
       select
@@ -60,18 +60,18 @@ type Data() =
     |> Sql.query sql
     |> Sql.parameters parameters
     |> Sql.execute (fun read ->
-        {
-            Id = read.uuid "id"
-            QueueName = read.text "queue_name"
-            Type = read.text "type"
-            Status = read.text "status"
-            ProgramPath = read.textOrNone "program_path"
-            ProgramType = read.textOrNone "program_type"
-            Payload = read.textOrNone "payload" |> Option.map JObject.Parse
-            CreatedAt = read.dateTime "created_at"
-            ExecutedAt = read.dateTimeOrNone "executed_at"
-            TimeElasped = read.intervalOrNone "time_elapsed"
-        })
+      {
+        Id = read.uuid "id"
+        QueueName = read.text "queue_name"
+        Type = read.text "type"
+        Status = read.text "status"
+        ProgramPath = read.textOrNone "program_path"
+        ProgramType = read.textOrNone "program_type"
+        Payload = read.textOrNone "payload" |> Option.map JObject.Parse
+        CreatedAt = read.dateTime "created_at"
+        ExecutedAt = read.dateTimeOrNone "executed_at"
+        TimeElasped = read.intervalOrNone "time_elapsed"
+      })
 
   member this.updateTask(task: Task) =
     let parameters = [
@@ -105,16 +105,16 @@ let rec processQueue () = async {
       let beginOfProcessing = DateTime.Now
       printfn "Process queue"
       let work = tasks |> List.map (fun task -> async {
-          let executedAt = DateTime.Now
-          printfn "Processing task %A" task.Id
-          // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
-          // emulate task running
-          do! Async.Sleep(1000)
-          let timeElapsed = DateTime.Now - executedAt
-          let status = "COMPLETED"
-          let n = data.updateTask ({task with ExecutedAt = executedAt |> Option.Some; TimeElasped = timeElapsed |> Option.Some; Status = status})
-          return 0
-        })
+        let executedAt = DateTime.Now
+        printfn "Processing task %A" task.Id
+        // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
+        // emulate task running
+        do! Async.Sleep(1000)
+        let timeElapsed = DateTime.Now - executedAt
+        let status = "COMPLETED"
+        let n = data.updateTask ({task with ExecutedAt = executedAt |> Option.Some; TimeElasped = timeElapsed |> Option.Some; Status = status})
+        return 0
+      })
       let! _ = work |> Async.Sequential
       let endOfProcessing = DateTime.Now
       let deltaTimeTillNextPollMs = endOfProcessing - beginOfProcessing
