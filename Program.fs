@@ -17,7 +17,7 @@ type Task = {
 }
 
 // TODO: use .environment variables or a json config for these
-let queues = [| "main"; "internal"; "external" |]
+let queues = [| "main"; "internal"; "external"; |]
 let timeTillNextPollMs = 3000
 let taskCount = 20
 
@@ -33,8 +33,8 @@ type Data() =
 
   member this.getTasks() =
     let parameters = [
-      ("@Queues", Sql.stringArray queues)
-      ("@TaskCount", Sql.int taskCount)
+      ("@Queues", Sql.stringArray queues);
+      ("@TaskCount", Sql.int taskCount);
     ]
     let sql = $"
       select
@@ -75,10 +75,10 @@ type Data() =
 
   member this.updateTask(task: Task) =
     let parameters = [
-        ("@Id", Sql.uuid task.Id)
-        ("@ExecutedAt", Sql.timestampOrNone task.ExecutedAt)
-        ("@TimeElasped", Sql.intervalOrNone task.TimeElasped)
-        ("@Status", Sql.text task.Status)
+        ("@Id", Sql.uuid task.Id);
+        ("@ExecutedAt", Sql.timestampOrNone task.ExecutedAt);
+        ("@TimeElasped", Sql.intervalOrNone task.TimeElasped);
+        ("@Status", Sql.text task.Status);
     ]
     let sql = $"
       UPDATE Task
@@ -95,7 +95,6 @@ type Data() =
     |> Sql.parameters parameters
     |> Sql.executeNonQuery
 
-// Function to process actions from the queue asynchronously
 let rec processQueue () = async {
   let data = Data()
   while true do
