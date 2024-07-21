@@ -1,0 +1,12 @@
+CREATE TABLE Task (
+  queue_names text[] NOT NULL,
+  type varchar(255) NOT NULL,
+  status varchar(50) NOT NULL,
+  payload json NULL,
+  result json NULL,
+  program_path text NULL,
+  program_type varchar(255) NULL,
+  created_at timestamp NOT NULL,
+  executed_at timestamp NULL,
+  time_elapsed interval NULL
+);
