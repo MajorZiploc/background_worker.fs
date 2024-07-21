@@ -102,6 +102,7 @@ let rec processQueue () = async {
     let tasks = data.getTasks()
     match tasks |> List.length with
     | i when i > 0 ->
+      let beginOfProcessing = DateTime.Now
       printfn "Process queue"
       let work = tasks |> List.map (fun task -> async {
           let executedAt = DateTime.Now
@@ -115,7 +116,9 @@ let rec processQueue () = async {
           return 0
         })
       let! _ = work |> Async.Sequential
-      do! Async.Sleep(timeTillNextPollMs)
+      let endOfProcessing = DateTime.Now
+      let deltaTimeTillNextPollMs = endOfProcessing - beginOfProcessing
+      do! Async.Sleep(max deltaTimeTillNextPollMs.Milliseconds 1000)
     | _ ->
       printfn "Nothing in queue"
       do! Async.Sleep(timeTillNextPollMs)
