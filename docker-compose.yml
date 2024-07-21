@@ -9,3 +9,17 @@ services:
     volumes:
       - '${PGDATALOCAL}:${PGDATA}'
     # command: sleep infinity
+
+  dotnet-app:
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    ports:
+      - "8000:80"
+    depends_on:
+      - pgsql
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    working_dir: /app
+    # command: ["dotnet", "run"]
+    command: sleep infinity

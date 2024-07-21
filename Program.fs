@@ -26,10 +26,10 @@ type Data() =
   member this.getConn() = new NpgsqlConnection(connectionString)
 
   member this.getConnStr() =
-    Sql.host "localhost"
+    Sql.host "pgsql"
     |> Sql.database "postgres"
     |> Sql.username "postgres"
-    |> Sql.password "postgres"
+    |> Sql.password "password"
     |> Sql.port 5432
     |> Sql.formatConnectionString
 
