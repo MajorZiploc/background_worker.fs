@@ -5,7 +5,7 @@ open Npgsql.FSharp
 
 type Task = {
   Id: Guid
-  QueueNames: string array
+  QueueName: string
   Type: string
   Status: string
   Payload: JObject option
@@ -15,6 +15,8 @@ type Task = {
   ExecutedAt: DateTime option
   TimeElasped: TimeSpan option
 }
+
+let queues = [| "main"; "internal"; "external" |]
 
 type Data() =
 
@@ -27,10 +29,13 @@ type Data() =
     |> Sql.formatConnectionString
 
   member this.getTasks() =
+    let parameters = [
+        ("@Queues", Sql.stringArray queues)
+    ]
     let sql = $"
       select
         id
-        , queue_names
+        , queue_name
         , type
         , status
         , payload
@@ -40,17 +45,20 @@ type Data() =
         , executed_at
         , time_elapsed
       from Task
-      where status = 'QUEUED'
+      where
+        status = 'QUEUED'
+        and queue_name = Any(@Queues)
       limit 20
       ;
     "
     this.getConnStr ()
     |> Sql.connect
     |> Sql.query sql
+    |> Sql.parameters parameters
     |> Sql.execute (fun read ->
         {
             Id = read.uuid "id"
-            QueueNames = read.stringArray "queue_names"
+            QueueName = read.text "queue_name"
             Type = read.text "type"
             Status = read.text "status"
             ProgramPath = read.textOrNone "program_path"

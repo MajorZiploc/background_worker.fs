@@ -6,10 +6,10 @@ from Task
 --   and executed_at is not null
 ;
 
--- INSERT INTO Task (queue_names, type, status, payload, result, program_path, program_type, created_at, executed_at, time_elapsed)
+-- INSERT INTO Task (queue_name, type, status, payload, result, program_path, program_type, created_at, executed_at, time_elapsed)
 -- VALUES
 -- (
---   ARRAY['main', 'external'],
+--   'external',
 --   'sync-with-partner2',
 --   'COMPLETED',
 --   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
@@ -21,7 +21,7 @@ from Task
 --   INTERVAL '1 day 2 hours'
 -- ),
 -- (
---   ARRAY['main', 'internal'],
+--   'internal',
 --   'sync-with-partner1',
 --   'QUEUED',
 --   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',

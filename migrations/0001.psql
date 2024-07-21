@@ -1,6 +1,7 @@
+-- UP:
 CREATE TABLE Task (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  queue_names text[] NOT NULL,
+  queue_name varchar(255) NOT NULL,
   type varchar(255) NOT NULL,
   status varchar(50) NOT NULL,
   payload json NULL,
@@ -11,5 +12,9 @@ CREATE TABLE Task (
   executed_at timestamp NULL,
   time_elapsed interval NULL
 );
-
 CREATE INDEX idx_task_status ON Task(status);
+CREATE INDEX idx_task_queue_name ON Task(queue_name);
+
+-- DOWN:
+-- drop table Task;
+
