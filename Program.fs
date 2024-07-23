@@ -96,7 +96,7 @@ let rec processQueue (cancellationToken: CancellationToken) = async {
         printfn "Processing queue"
         let work = tasks |> List.map (fun task -> async {
           let executedAt = DateTime.Now
-          printfn "Processing task %A" task.Id
+          printfn "Processing task: Id: %A; QueueName: %A; Type: %A" task.Id task.QueueName task.Type
           // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
           // Emulate task running
           do! Async.Sleep(1000)
