@@ -21,15 +21,15 @@ type Task = {
 let queues = (Environment.GetEnvironmentVariable "QUEUES").Split ","
 let timeTillNextPollMs = Environment.GetEnvironmentVariable "TIME_TILL_NEXT_POLL_MS" |> int
 let taskCount = Environment.GetEnvironmentVariable "TASK_COUNT" |> int
+let connectionString =
+  Sql.host (Environment.GetEnvironmentVariable "PGHOST")
+  |> Sql.database (Environment.GetEnvironmentVariable "PGDATABASE")
+  |> Sql.username (Environment.GetEnvironmentVariable "PGUSER")
+  |> Sql.password (Environment.GetEnvironmentVariable "PGPASSWORD")
+  |> Sql.port (int (Environment.GetEnvironmentVariable "PGPORT"))
+  |> Sql.formatConnectionString
 
 type Data() =
-  member this.getConnStr() =
-    Sql.host (Environment.GetEnvironmentVariable "PGHOST")
-    |> Sql.database (Environment.GetEnvironmentVariable "PGDATABASE")
-    |> Sql.username (Environment.GetEnvironmentVariable "PGUSER")
-    |> Sql.password (Environment.GetEnvironmentVariable "PGPASSWORD")
-    |> Sql.port (int (Environment.GetEnvironmentVariable "PGPORT"))
-    |> Sql.formatConnectionString
 
   member this.getTasks() =
     let parameters = [
@@ -46,7 +46,7 @@ type Data() =
         and queue_name = any(@Queues)
       limit @TaskCount;
     """
-    this.getConnStr ()
+    connectionString
     |> Sql.connect
     |> Sql.query sql
     |> Sql.parameters parameters
@@ -76,7 +76,7 @@ type Data() =
       set executed_at = @ExecutedAt, time_elapsed = @TimeElasped, status = @Status
       where id = @Id;
     """
-    this.getConnStr ()
+    connectionString
     |> Sql.connect
     |> Sql.query sql
     |> Sql.parameters parameters
