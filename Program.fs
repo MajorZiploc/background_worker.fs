@@ -107,7 +107,7 @@ let processQueue (cancellationToken: CancellationToken) = async {
           do! Async.Sleep(1000)
           let timeElapsed = DateTime.Now - executedAt
           let status = "COMPLETED"
-          let n = data.updateTask ({ task with ExecutedAt = executedAt |> Some ; TimeElasped = timeElapsed |> Some ; Status = status }), connection = connection
+          let n = data.updateTask { task with ExecutedAt = executedAt |> Some ; TimeElasped = timeElapsed |> Some ; Status = status }, connection = connection
           return 0
         })
         let! _ = work |> Async.Sequential
