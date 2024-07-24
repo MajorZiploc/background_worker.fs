@@ -86,7 +86,7 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
     |> Sql.parameters parameters
     |> Sql.executeNonQuery
 
-let rec processQueue (cancellationToken: CancellationToken) = async {
+let processQueue (cancellationToken: CancellationToken) = async {
   let data = Data(connectionString, queues, taskCount)
   while not cancellationToken.IsCancellationRequested do
     try
