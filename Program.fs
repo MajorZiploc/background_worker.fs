@@ -108,6 +108,36 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
     |> Sql.parameters parameters
     |> Sql.executeNonQuery
 
+let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async {
+  let executedAt = DateTime.Now
+  let shouldRun = task.ValidProgramQueueName = task.QueueName
+  if not shouldRun then
+    printfn "Program is not valid for the queue. task.QueueName: %A; task.ValidPrograQueueName: %A" task.QueueName task.ValidProgramQueueName
+    let status = "FAILED"
+    let n = data.updateTask { task with ExecutedAt = None; TimeElasped = None; Status = status; }, connection = connection
+    return 1
+  else
+    printfn "Processing task: Id: %A; QueueName: %A; Type: %A" task.Id task.QueueName task.Type
+    // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
+    // Emulate task running
+    do! Async.Sleep(1000)
+    let timeElapsed = DateTime.Now - executedAt
+    let retryCount = task.RetryCount - 1
+    let failed =
+      task.Payload
+      |> Option.bind (fun jo ->
+          jo.GetValue("autoFail") |> Option.ofObjForce |> Option.map (fun token -> token.Type = JTokenType.Boolean && token.Value<bool>())
+      )
+      |> Option.defaultValue false
+    let status = if not failed then "COMPLETED" else if retryCount <= 0 then "FAILED" else "QUEUED"
+    match status with
+    | "FAILED" -> printfn "Task failed and is not being reattempted."
+    | "QUEUED" -> printfn "Task failed and is being requeued."
+    | _ -> () // No action needed for other statuses
+    let n = data.updateTask { task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status; RetryCount = retryCount; }, connection = connection
+    return if status = "FAILED" then 1 else 0
+}
+
 let processQueue (cancellationToken: CancellationToken) = async {
   let data = Data(connectionString, queues, taskCount)
   while not cancellationToken.IsCancellationRequested do
@@ -121,35 +151,7 @@ let processQueue (cancellationToken: CancellationToken) = async {
       | _ ->
         let beginOfProcessing = DateTime.Now
         printfn "Processing queue"
-        let work = tasks |> List.map (fun task -> async {
-          let executedAt = DateTime.Now
-          let shouldRun = task.ValidProgramQueueName = task.QueueName
-          if not shouldRun then
-            printfn "Program is not valid for the queue. task.QueueName: %A; task.ValidPrograQueueName: %A" task.QueueName task.ValidProgramQueueName
-            let status = "FAILED"
-            let n = data.updateTask { task with ExecutedAt = None; TimeElasped = None; Status = status; }, connection = connection
-            return 1
-          else
-            printfn "Processing task: Id: %A; QueueName: %A; Type: %A" task.Id task.QueueName task.Type
-            // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
-            // Emulate task running
-            do! Async.Sleep(1000)
-            let timeElapsed = DateTime.Now - executedAt
-            let retryCount = task.RetryCount - 1
-            let failed =
-              task.Payload
-              |> Option.bind (fun jo ->
-                  jo.GetValue("autoFail") |> Option.ofObjForce |> Option.map (fun token -> token.Type = JTokenType.Boolean && token.Value<bool>())
-              )
-              |> Option.defaultValue false
-            let status = if not failed then "COMPLETED" else if retryCount <= 0 then "FAILED" else "QUEUED"
-            match status with
-            | "FAILED" -> printfn "Task failed and is not being reattempted."
-            | "QUEUED" -> printfn "Task failed and is being requeued."
-            | _ -> () // No action needed for other statuses
-            let n = data.updateTask { task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status; RetryCount = retryCount; }, connection = connection
-            return if status = "FAILED" then 1 else 0
-        })
+        let work = tasks |> List.map (executeWorkItem connection data)
         let! _ = work |> Async.Sequential
         let endOfProcessing = DateTime.Now
         let deltaTimeTillNextPollMs = endOfProcessing - beginOfProcessing
