@@ -24,6 +24,11 @@ VALUES
   'task_master',
   '/Users/manyu/projects/tooling_notes/fs_prac',
   'dotnet-cli'
+),
+(
+  'task_master_2',
+  '/Users/manyu/projects/tooling_notes/fs_prac',
+  'dotnet-cli'
 )
 ;
 
@@ -114,6 +119,17 @@ VALUES
   null,
   null,
   0
+),
+(
+  'task_master_2',
+  'internal',
+  'sync-with-partner1',
+  'QUEUED',
+  '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
+  null,
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  null,
+  null,
+  0
 )
 ;
-

@@ -28,6 +28,7 @@ CREATE TABLE Task (
 );
 CREATE INDEX idx_task_status ON Task(status);
 CREATE INDEX idx_task_queue_name ON Task(queue_name);
+CREATE INDEX idx_task_machine_name ON Task(machine_name);
 
 -- DOWN:
 -- drop table Task;

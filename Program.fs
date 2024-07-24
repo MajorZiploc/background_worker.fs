@@ -24,6 +24,7 @@ type Task = {
 let timeTillNextPollMs = Environment.GetEnvironmentVariable "TIME_TILL_NEXT_POLL_MS" |> int
 
 let queues = (Environment.GetEnvironmentVariable "QUEUES").Split ","
+let machineName = Environment.GetEnvironmentVariable "MACHINE_NAME"
 let taskCount = Environment.GetEnvironmentVariable "TASK_COUNT" |> int
 let connectionString =
   Sql.host (Environment.GetEnvironmentVariable "PGHOST")
@@ -33,7 +34,7 @@ let connectionString =
   |> Sql.port (int (Environment.GetEnvironmentVariable "PGPORT"))
   |> Sql.formatConnectionString
 
-type Data(connectionString: string, queues: string array, taskCount: int) =
+type Data(connectionString: string, queues: string array, taskCount: int, machineName: string) =
 
   member this.getConnection() = connectionString |> Sql.connect
 
@@ -44,6 +45,7 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
   member this.getTasks (?connection: Sql.SqlProps) =
     let parameters = [
       ("@Queues", Sql.stringArray queues);
+      ("@MachineName", Sql.string machineName);
       ("@TaskCount", Sql.int taskCount);
     ]
     let sql = $"""
@@ -67,6 +69,7 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
       where
         t.status = 'QUEUED'
         and t.queue_name = any(@Queues)
+        and t.machine_name = @MachineName
       limit @TaskCount;
     """
     this.getConnectionWithDefault connection
@@ -142,7 +145,7 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async
 }
 
 let processQueue (cancellationToken: CancellationToken) = async {
-  let data = Data(connectionString, queues, taskCount)
+  let data = Data(connectionString, queues, taskCount, machineName)
   while not cancellationToken.IsCancellationRequested do
     try
       let connection = data.getConnection()
