@@ -10,7 +10,8 @@ CREATE TABLE Task (
   program_type varchar(255) NULL,
   created_at timestamp NOT NULL,
   executed_at timestamp NULL,
-  time_elapsed interval NULL
+  time_elapsed interval NULL,
+  retry_count smallint DEFAULT 0
 );
 CREATE INDEX idx_task_status ON Task(status);
 CREATE INDEX idx_task_queue_name ON Task(queue_name);

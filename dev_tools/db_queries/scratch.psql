@@ -6,44 +6,102 @@ from Task
 --   and executed_at is not null
 ;
 
+
 -- truncate table Task;
 
--- INSERT INTO Task (queue_name, type, status, payload, result, program_path, program_type, created_at, executed_at, time_elapsed)
--- VALUES
--- (
---   'external',
---   'sync-with-partner2',
---   'COMPLETED',
---   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
---   null,
---   null,
---   null,
---   NOW(),
---   NOW() - INTERVAL '1 day',
---   INTERVAL '1 day 2 hours'
--- ),
--- (
---   'internal',
---   'sync-with-partner1',
---   'QUEUED',
---   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
---   null,
---   '/Users/manyu/projects/tooling_notes/fs_prac',
---   'dotnet-cli',
---   NOW(),
---   null,
---   null
--- ),
--- (
---   'internal',
---   'sync-with-partner1',
---   'QUEUED',
---   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
---   null,
---   '/Users/manyu/projects/tooling_notes/fs_prac',
---   'dotnet-cli',
---   NOW(),
---   null,
---   null
--- )
--- ;
+-- drop table Task;
+
+INSERT INTO Task (queue_name, type, status, payload, result, program_path, program_type, created_at, executed_at, time_elapsed, retry_count)
+VALUES
+(
+  'external',
+  'sync-with-partner2',
+  'COMPLETED',
+  '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
+  null,
+  null,
+  null,
+  NOW(),
+  NOW() - INTERVAL '1 day',
+  INTERVAL '1 day 2 hours',
+  0
+),
+(
+  'internal',
+  'sync-with-partner1',
+  'QUEUED',
+  '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
+  null,
+  '/Users/manyu/projects/tooling_notes/fs_prac',
+  'dotnet-cli',
+  NOW(),
+  null,
+  null,
+  0
+),
+(
+  'internal',
+  'sync-with-partner1',
+  'QUEUED',
+  '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
+  null,
+  '/Users/manyu/projects/tooling_notes/fs_prac',
+  'dotnet-cli',
+  NOW(),
+  null,
+  null,
+  0
+),
+(
+  'different_workers_queue',
+  'sync-with-partner2',
+  'QUEUED',
+  '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
+  null,
+  '/Users/manyu/projects/tooling_notes/fs_prac',
+  'dotnet-cli',
+  NOW(),
+  null,
+  null,
+  2
+),
+(
+  'internal',
+  'sync-with-partner2',
+  'QUEUED',
+  '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
+  null,
+  '/Users/manyu/projects/tooling_notes/fs_prac',
+  'dotnet-cli',
+  NOW(),
+  null,
+  null,
+  2
+),
+(
+  'internal',
+  'sync-with-partner2',
+  'QUEUED',
+  '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
+  null,
+  '/Users/manyu/projects/tooling_notes/fs_prac',
+  'dotnet-cli',
+  NOW(),
+  null,
+  null,
+  2
+),
+(
+  'internal',
+  'sync-with-partner2',
+  'QUEUED',
+  '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
+  null,
+  '/Users/manyu/projects/tooling_notes/fs_prac',
+  'dotnet-cli',
+  NOW(),
+  null,
+  null,
+  0
+)
+;

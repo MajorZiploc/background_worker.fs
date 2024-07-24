@@ -15,6 +15,7 @@ type Task = {
   CreatedAt: DateTime
   ExecutedAt: DateTime option
   TimeElasped: TimeSpan option
+  RetryCount: int
 }
 
 let timeTillNextPollMs = Environment.GetEnvironmentVariable "TIME_TILL_NEXT_POLL_MS" |> int
@@ -44,8 +45,17 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
     ]
     let sql = $"""
       select
-        id, queue_name, type, status, payload, program_path, program_type,
-        created_at, executed_at, time_elapsed
+        id
+        , queue_name
+        , type
+        , status
+        , payload
+        , program_path
+        , program_type
+        , created_at
+        , executed_at
+        , time_elapsed
+        , retry_count
       from Task
       where
         status = 'QUEUED'
@@ -67,6 +77,7 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
         CreatedAt = read.dateTime "created_at"
         ExecutedAt = read.dateTimeOrNone "executed_at"
         TimeElasped = read.intervalOrNone "time_elapsed"
+        RetryCount = read.int "retry_count"
       })
 
   member this.updateTask (task: Task, ?connection: Sql.SqlProps) =
@@ -75,10 +86,14 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
       ("@ExecutedAt", Sql.timestampOrNone task.ExecutedAt);
       ("@TimeElasped", Sql.intervalOrNone task.TimeElasped);
       ("@Status", Sql.text task.Status);
+      ("@RetryCount", Sql.int task.RetryCount);
     ]
     let sql = $"""
-      update Task
-      set executed_at = @ExecutedAt, time_elapsed = @TimeElasped, status = @Status
+      update Task set
+        executed_at = @ExecutedAt
+        , time_elapsed = @TimeElasped
+        , status = @Status
+        , retry_count = @RetryCount
       where id = @Id;
     """
     this.getConnectionWithDefault connection
@@ -106,8 +121,15 @@ let processQueue (cancellationToken: CancellationToken) = async {
           // Emulate task running
           do! Async.Sleep(1000)
           let timeElapsed = DateTime.Now - executedAt
-          let status = "COMPLETED"
-          let n = data.updateTask { task with ExecutedAt = executedAt |> Some ; TimeElasped = timeElapsed |> Some ; Status = status }, connection = connection
+          let retryCount = task.RetryCount - 1
+          let failed =
+            task.Payload
+            |> Option.bind (fun jo ->
+                jo.GetValue("autoFail") |> Option.ofObjForce |> Option.map (fun token -> token.Type = JTokenType.Boolean && token.Value<bool>())
+            )
+            |> Option.defaultValue false
+          let status = if not failed then "COMPLETED" else if retryCount <= 0 then "FAILED" else "QUEUED"
+          let n = data.updateTask { task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status; RetryCount = retryCount }, connection = connection
           return 0
         })
         let! _ = work |> Async.Sequential
