@@ -129,6 +129,10 @@ let processQueue (cancellationToken: CancellationToken) = async {
             )
             |> Option.defaultValue false
           let status = if not failed then "COMPLETED" else if retryCount <= 0 then "FAILED" else "QUEUED"
+          match status with
+          | "FAILED" -> printfn "Task failed and is not being reattempted."
+          | "QUEUED" -> printfn "Task failed and is being requeued."
+          | _ -> () // No action needed for other statuses
           let n = data.updateTask { task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status; RetryCount = retryCount }, connection = connection
           return 0
         })
