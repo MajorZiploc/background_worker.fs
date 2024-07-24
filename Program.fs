@@ -6,6 +6,7 @@ open System.Threading
 
 type Task = {
   Id: Guid
+  MachineName: string
   QueueName: string
   Type: string
   Status: string
@@ -13,7 +14,7 @@ type Task = {
   ValidProgramId: Guid
   ProgramPath: string option
   ProgramType: string
-  ValidProgramQueueName: string
+  ValidProgramMachineName: string
   CreatedAt: DateTime
   ExecutedAt: DateTime option
   TimeElasped: TimeSpan option
@@ -48,6 +49,7 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
     let sql = $"""
       select
         t.id
+        , t.machine_name
         , t.queue_name
         , t.type
         , t.status
@@ -55,7 +57,7 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
         , t.valid_program_id
         , vp.program_path
         , vp.program_type
-        , vp.queue_name as valid_program_queue_name
+        , vp.machine_name as valid_program_machine_name
         , t.created_at
         , t.executed_at
         , t.time_elapsed
@@ -73,13 +75,14 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
     |> Sql.execute (fun read ->
       {
         Id = read.uuid "id"
+        MachineName = read.text "machine_name"
         QueueName = read.text "queue_name"
         Type = read.text "type"
         Status = read.text "status"
         ValidProgramId = read.uuid "valid_program_id"
         ProgramPath = read.textOrNone "program_path"
         ProgramType = read.text "program_type"
-        ValidProgramQueueName = read.text "valid_program_queue_name"
+        ValidProgramMachineName = read.text "valid_program_machine_name"
         Payload = read.textOrNone "payload" |> Option.map JObject.Parse
         CreatedAt = read.dateTime "created_at"
         ExecutedAt = read.dateTimeOrNone "executed_at"
@@ -110,9 +113,9 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
 
 let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async {
   let executedAt = DateTime.Now
-  let shouldRun = task.ValidProgramQueueName = task.QueueName
+  let shouldRun = task.ValidProgramMachineName = task.MachineName
   if not shouldRun then
-    printfn "Program is not valid for the queue. task.QueueName: %A; task.ValidPrograQueueName: %A" task.QueueName task.ValidProgramQueueName
+    printfn "Program is not valid for the machine. task.MachineName: %A; task.ValidProgramMachineName: %A" task.MachineName task.ValidProgramMachineName
     let status = "FAILED"
     let n = data.updateTask { task with ExecutedAt = None; TimeElasped = None; Status = status; }, connection = connection
     return 1

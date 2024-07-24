@@ -18,10 +18,10 @@ from ValidProgram
 -- drop table Task;
 
 
-INSERT INTO ValidProgram (queue_name, program_path, program_type)
+INSERT INTO ValidProgram (machine_name, program_path, program_type)
 VALUES
 (
-  'internal',
+  'task_master',
   '/Users/manyu/projects/tooling_notes/fs_prac',
   'dotnet-cli'
 )
@@ -29,83 +29,91 @@ VALUES
 
 
 
-INSERT INTO Task (queue_name, type, status, payload, result, valid_program_id, executed_at, time_elapsed, retry_count)
+INSERT INTO Task (machine_name, queue_name, type, status, payload, result, valid_program_id, executed_at, time_elapsed, retry_count)
 VALUES
 (
+  'task_master',
   'external',
   'sync-with-partner2',
   'COMPLETED',
   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   NOW() - INTERVAL '1 day',
   INTERVAL '1 day 2 hours',
   0
 ),
 (
+  'task_master',
   'internal',
   'sync-with-partner1',
   'QUEUED',
   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   0
 ),
 (
+  'task_master',
   'internal',
   'sync-with-partner1',
   'QUEUED',
   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   0
 ),
 (
+  'task_master',
   'different_workers_queue',
   'sync-with-partner2',
   'QUEUED',
   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   2
 ),
 (
+  'task_master',
   'internal',
   'sync-with-partner2',
   'QUEUED',
   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   2
 ),
 (
+  'task_master',
   'internal',
   'sync-with-partner2',
   'QUEUED',
   '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   2
 ),
 (
+  'task_master',
   'internal',
   'sync-with-partner2',
   'QUEUED',
   '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   0
 )
 ;
+

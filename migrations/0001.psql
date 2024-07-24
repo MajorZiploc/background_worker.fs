@@ -2,15 +2,16 @@
 
 CREATE TABLE ValidProgram (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  queue_name varchar(255) NOT NULL,
+  machine_name varchar(255) NOT NULL,
   program_path text NULL,
   program_type varchar(255) NOT NULL,
   created_at timestamp NOT NULL DEFAULT NOW()
 );
-CREATE INDEX idx_valid_program_queue_name ON ValidProgram(queue_name);
+CREATE INDEX idx_valid_program_queue_name ON ValidProgram(machine_name);
 
 CREATE TABLE Task (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  machine_name varchar(255) NOT NULL,
   queue_name varchar(255) NOT NULL,
   type varchar(255) NOT NULL,
   status varchar(50) NOT NULL,
