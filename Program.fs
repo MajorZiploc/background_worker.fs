@@ -3,7 +3,6 @@ open Acadian.FSharp
 open Newtonsoft.Json.Linq
 open Npgsql.FSharp
 open System.Threading
-open System.Threading.Tasks
 
 type Task = {
   Id: Guid
@@ -18,8 +17,9 @@ type Task = {
   TimeElasped: TimeSpan option
 }
 
-let queues = (Environment.GetEnvironmentVariable "QUEUES").Split ","
 let timeTillNextPollMs = Environment.GetEnvironmentVariable "TIME_TILL_NEXT_POLL_MS" |> int
+
+let queues = (Environment.GetEnvironmentVariable "QUEUES").Split ","
 let taskCount = Environment.GetEnvironmentVariable "TASK_COUNT" |> int
 let connectionString =
   Sql.host (Environment.GetEnvironmentVariable "PGHOST")
@@ -29,9 +29,15 @@ let connectionString =
   |> Sql.port (int (Environment.GetEnvironmentVariable "PGPORT"))
   |> Sql.formatConnectionString
 
-type Data() =
+type Data(connectionString: string, queues: string array, taskCount: int) =
 
-  member this.getTasks() =
+  member this.getConnection() = connectionString |> Sql.connect
+
+  member this.getConnectionWithDefault(connection: Sql.SqlProps option) =
+    connection
+    |> Option.defaultWith this.getConnection
+
+  member this.getTasks (?connection: Sql.SqlProps) =
     let parameters = [
       ("@Queues", Sql.stringArray queues);
       ("@TaskCount", Sql.int taskCount);
@@ -46,8 +52,7 @@ type Data() =
         and queue_name = any(@Queues)
       limit @TaskCount;
     """
-    connectionString
-    |> Sql.connect
+    this.getConnectionWithDefault connection
     |> Sql.query sql
     |> Sql.parameters parameters
     |> Sql.execute (fun read ->
@@ -64,7 +69,7 @@ type Data() =
         TimeElasped = read.intervalOrNone "time_elapsed"
       })
 
-  member this.updateTask(task: Task) =
+  member this.updateTask (task: Task, ?connection: Sql.SqlProps) =
     let parameters = [
       ("@Id", Sql.uuid task.Id);
       ("@ExecutedAt", Sql.timestampOrNone task.ExecutedAt);
@@ -76,17 +81,17 @@ type Data() =
       set executed_at = @ExecutedAt, time_elapsed = @TimeElasped, status = @Status
       where id = @Id;
     """
-    connectionString
-    |> Sql.connect
+    this.getConnectionWithDefault connection
     |> Sql.query sql
     |> Sql.parameters parameters
     |> Sql.executeNonQuery
 
 let rec processQueue (cancellationToken: CancellationToken) = async {
-  let data = Data()
+  let data = Data(connectionString, queues, taskCount)
   while not cancellationToken.IsCancellationRequested do
     try
-      let tasks = data.getTasks()
+      let connection = data.getConnection()
+      let tasks = data.getTasks connection
       match tasks with
       | [] ->
         printfn "Nothing in queue"
@@ -102,7 +107,7 @@ let rec processQueue (cancellationToken: CancellationToken) = async {
           do! Async.Sleep(1000)
           let timeElapsed = DateTime.Now - executedAt
           let status = "COMPLETED"
-          let n = data.updateTask ({ task with ExecutedAt = executedAt |> Some ; TimeElasped = timeElapsed |> Some ; Status = status })
+          let n = data.updateTask ({ task with ExecutedAt = executedAt |> Some ; TimeElasped = timeElapsed |> Some ; Status = status }), connection = connection
           return 0
         })
         let! _ = work |> Async.Sequential
