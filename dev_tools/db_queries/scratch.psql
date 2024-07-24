@@ -7,11 +7,29 @@ from Task
 ;
 
 
+select
+  *
+from ValidProgram
+;
+
+
 -- truncate table Task;
 
 -- drop table Task;
 
-INSERT INTO Task (queue_name, type, status, payload, result, program_path, program_type, created_at, executed_at, time_elapsed, retry_count)
+
+INSERT INTO ValidProgram (queue_name, program_path, program_type)
+VALUES
+(
+  'internal',
+  '/Users/manyu/projects/tooling_notes/fs_prac',
+  'dotnet-cli'
+)
+;
+
+
+
+INSERT INTO Task (queue_name, type, status, payload, result, valid_program_id, executed_at, time_elapsed, retry_count)
 VALUES
 (
   'external',
@@ -19,9 +37,7 @@ VALUES
   'COMPLETED',
   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  null,
-  null,
-  NOW(),
+  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   NOW() - INTERVAL '1 day',
   INTERVAL '1 day 2 hours',
   0
@@ -32,9 +48,7 @@ VALUES
   'QUEUED',
   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  '/Users/manyu/projects/tooling_notes/fs_prac',
-  'dotnet-cli',
-  NOW(),
+  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   0
@@ -45,9 +59,7 @@ VALUES
   'QUEUED',
   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  '/Users/manyu/projects/tooling_notes/fs_prac',
-  'dotnet-cli',
-  NOW(),
+  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   0
@@ -58,9 +70,7 @@ VALUES
   'QUEUED',
   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  '/Users/manyu/projects/tooling_notes/fs_prac',
-  'dotnet-cli',
-  NOW(),
+  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   2
@@ -71,9 +81,7 @@ VALUES
   'QUEUED',
   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  '/Users/manyu/projects/tooling_notes/fs_prac',
-  'dotnet-cli',
-  NOW(),
+  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   2
@@ -84,9 +92,7 @@ VALUES
   'QUEUED',
   '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  '/Users/manyu/projects/tooling_notes/fs_prac',
-  'dotnet-cli',
-  NOW(),
+  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   2
@@ -97,9 +103,7 @@ VALUES
   'QUEUED',
   '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
   null,
-  '/Users/manyu/projects/tooling_notes/fs_prac',
-  'dotnet-cli',
-  NOW(),
+  (select id from ValidProgram where queue_name = 'internal' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
   null,
   null,
   0

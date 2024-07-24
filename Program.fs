@@ -10,8 +10,10 @@ type Task = {
   Type: string
   Status: string
   Payload: JObject option
+  ValidProgramId: Guid
   ProgramPath: string option
-  ProgramType: string option
+  ProgramType: string
+  ValidProgramQueueName: string
   CreatedAt: DateTime
   ExecutedAt: DateTime option
   TimeElasped: TimeSpan option
@@ -45,21 +47,24 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
     ]
     let sql = $"""
       select
-        id
-        , queue_name
-        , type
-        , status
-        , payload
-        , program_path
-        , program_type
-        , created_at
-        , executed_at
-        , time_elapsed
-        , retry_count
-      from Task
+        t.id
+        , t.queue_name
+        , t.type
+        , t.status
+        , t.payload
+        , t.valid_program_id
+        , vp.program_path
+        , vp.program_type
+        , vp.queue_name as valid_program_queue_name
+        , t.created_at
+        , t.executed_at
+        , t.time_elapsed
+        , t.retry_count
+      from Task as t
+      inner join ValidProgram as vp on t.valid_program_id = vp.id
       where
-        status = 'QUEUED'
-        and queue_name = any(@Queues)
+        t.status = 'QUEUED'
+        and t.queue_name = any(@Queues)
       limit @TaskCount;
     """
     this.getConnectionWithDefault connection
@@ -71,8 +76,10 @@ type Data(connectionString: string, queues: string array, taskCount: int) =
         QueueName = read.text "queue_name"
         Type = read.text "type"
         Status = read.text "status"
+        ValidProgramId = read.uuid "valid_program_id"
         ProgramPath = read.textOrNone "program_path"
-        ProgramType = read.textOrNone "program_type"
+        ProgramType = read.text "program_type"
+        ValidProgramQueueName = read.text "valid_program_queue_name"
         Payload = read.textOrNone "payload" |> Option.map JObject.Parse
         CreatedAt = read.dateTime "created_at"
         ExecutedAt = read.dateTimeOrNone "executed_at"
@@ -116,25 +123,32 @@ let processQueue (cancellationToken: CancellationToken) = async {
         printfn "Processing queue"
         let work = tasks |> List.map (fun task -> async {
           let executedAt = DateTime.Now
-          printfn "Processing task: Id: %A; QueueName: %A; Type: %A" task.Id task.QueueName task.Type
-          // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
-          // Emulate task running
-          do! Async.Sleep(1000)
-          let timeElapsed = DateTime.Now - executedAt
-          let retryCount = task.RetryCount - 1
-          let failed =
-            task.Payload
-            |> Option.bind (fun jo ->
-                jo.GetValue("autoFail") |> Option.ofObjForce |> Option.map (fun token -> token.Type = JTokenType.Boolean && token.Value<bool>())
-            )
-            |> Option.defaultValue false
-          let status = if not failed then "COMPLETED" else if retryCount <= 0 then "FAILED" else "QUEUED"
-          match status with
-          | "FAILED" -> printfn "Task failed and is not being reattempted."
-          | "QUEUED" -> printfn "Task failed and is being requeued."
-          | _ -> () // No action needed for other statuses
-          let n = data.updateTask { task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status; RetryCount = retryCount }, connection = connection
-          return 0
+          let shouldRun = task.ValidProgramQueueName = task.QueueName
+          if not shouldRun then
+            printfn "Program is not valid for the queue. task.QueueName: %A; task.ValidPrograQueueName: %A" task.QueueName task.ValidProgramQueueName
+            let status = "FAILED"
+            let n = data.updateTask { task with ExecutedAt = None; TimeElasped = None; Status = status; }, connection = connection
+            return 1
+          else
+            printfn "Processing task: Id: %A; QueueName: %A; Type: %A" task.Id task.QueueName task.Type
+            // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
+            // Emulate task running
+            do! Async.Sleep(1000)
+            let timeElapsed = DateTime.Now - executedAt
+            let retryCount = task.RetryCount - 1
+            let failed =
+              task.Payload
+              |> Option.bind (fun jo ->
+                  jo.GetValue("autoFail") |> Option.ofObjForce |> Option.map (fun token -> token.Type = JTokenType.Boolean && token.Value<bool>())
+              )
+              |> Option.defaultValue false
+            let status = if not failed then "COMPLETED" else if retryCount <= 0 then "FAILED" else "QUEUED"
+            match status with
+            | "FAILED" -> printfn "Task failed and is not being reattempted."
+            | "QUEUED" -> printfn "Task failed and is being requeued."
+            | _ -> () // No action needed for other statuses
+            let n = data.updateTask { task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status; RetryCount = retryCount; }, connection = connection
+            return if status = "FAILED" then 1 else 0
         })
         let! _ = work |> Async.Sequential
         let endOfProcessing = DateTime.Now

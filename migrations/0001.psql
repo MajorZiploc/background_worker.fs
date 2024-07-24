@@ -1,4 +1,14 @@
 -- UP:
+
+CREATE TABLE ValidProgram (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  queue_name varchar(255) NOT NULL,
+  program_path text NULL,
+  program_type varchar(255) NOT NULL,
+  created_at timestamp NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_valid_program_queue_name ON ValidProgram(queue_name);
+
 CREATE TABLE Task (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   queue_name varchar(255) NOT NULL,
@@ -6,16 +16,19 @@ CREATE TABLE Task (
   status varchar(50) NOT NULL,
   payload json NULL,
   result json NULL,
-  program_path text NULL,
-  program_type varchar(255) NULL,
-  created_at timestamp NOT NULL,
+  valid_program_id uuid NOT NULL,
+  created_at timestamp NOT NULL DEFAULT NOW(),
   executed_at timestamp NULL,
   time_elapsed interval NULL,
-  retry_count smallint DEFAULT 0
+  retry_count smallint DEFAULT 0,
+  CONSTRAINT fk_valid_program
+    FOREIGN KEY (valid_program_id)
+    REFERENCES ValidProgram(id)
 );
 CREATE INDEX idx_task_status ON Task(status);
 CREATE INDEX idx_task_queue_name ON Task(queue_name);
 
 -- DOWN:
 -- drop table Task;
+-- drop table ValidProgram;
 
