@@ -20,9 +20,13 @@ CREATE TABLE Task (
   executed_at timestamp NULL,
   time_elapsed interval NULL,
   retry_count smallint DEFAULT 0,
+  prev_task_id uuid NULL,
   CONSTRAINT fk_valid_program
     FOREIGN KEY (valid_program_id)
-    REFERENCES ValidProgram(id)
+    REFERENCES ValidProgram(id),
+  CONSTRAINT fk_last_task_run
+    FOREIGN KEY (prev_task_id)
+    REFERENCES Task(id)
 );
 CREATE INDEX idx_task_status ON Task(status);
 CREATE INDEX idx_task_queue_name ON Task(queue_name);

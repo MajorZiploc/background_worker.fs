@@ -1,5 +1,3 @@
-# TODO:
+# background_worker.fs
 
-Implement exponential backoff for rety on failing tasks
-
-NOTE: this maybe be difficult. a simplier approach might be to fail the failed task and insert a new QUEUED task with retry decremented. this way, a task wont block the rest of the tasks
+LA basic implementation of a worker that uses a postgresql table as a queue

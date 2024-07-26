@@ -19,6 +19,7 @@ type Task = {
   ExecutedAt: DateTime option
   TimeElasped: TimeSpan option
   RetryCount: int
+  PrevTaskId: Guid option
 }
 
 let timeTillNextPollMs = Environment.GetEnvironmentVariable "TIME_TILL_NEXT_POLL_MS" |> int
@@ -64,6 +65,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         , t.executed_at
         , t.time_elapsed
         , t.retry_count
+        , t.prev_task_id
       from Task as t
       inner join ValidProgram as vp on t.valid_program_id = vp.id
       where
@@ -91,6 +93,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         ExecutedAt = read.dateTimeOrNone "executed_at"
         TimeElasped = read.intervalOrNone "time_elapsed"
         RetryCount = read.int "retry_count"
+        PrevTaskId = read.uuidOrNone "prev_task_id"
       })
 
   member this.updateTask (task: Task, ?connection: Sql.SqlProps) =
@@ -99,15 +102,54 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
       ("@ExecutedAt", Sql.timestampOrNone task.ExecutedAt);
       ("@TimeElasped", Sql.intervalOrNone task.TimeElasped);
       ("@Status", Sql.text task.Status);
-      ("@RetryCount", Sql.int task.RetryCount);
     ]
     let sql = $"""
       update Task set
         executed_at = @ExecutedAt
         , time_elapsed = @TimeElasped
         , status = @Status
-        , retry_count = @RetryCount
       where id = @Id;
+    """
+    this.getConnectionWithDefault connection
+    |> Sql.query sql
+    |> Sql.parameters parameters
+    |> Sql.executeNonQuery
+
+  member this.createTaskFromFailedTask (task: Task, ?connection: Sql.SqlProps) =
+    let parameters = [
+      ("@Id", Sql.uuid task.Id);
+      ("@RetryCount", Sql.int task.RetryCount);
+    ]
+    let sql = $"""
+      insert into Task
+        (
+          machine_name
+          , queue_name
+          , type
+          , status
+          , payload
+          , result
+          , valid_program_id
+          , executed_at
+          , time_elapsed
+          , retry_count
+          , prev_task_id
+        )
+      select
+          t.machine_name
+          , t.queue_name
+          , t.type
+          , 'QUEUED'
+          , t.payload
+          , null
+          , t.valid_program_id
+          , null
+          , null
+          , @RetryCount
+          , @Id
+      from Task as t
+      where t.id = @Id
+      ;
     """
     this.getConnectionWithDefault connection
     |> Sql.query sql
@@ -120,27 +162,30 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async
   if not shouldRun then
     printfn "Program is not valid for the machine. task.MachineName: %A; task.ValidProgramMachineName: %A" task.MachineName task.ValidProgramMachineName
     let status = "FAILED"
-    let n = data.updateTask { task with ExecutedAt = None; TimeElasped = None; Status = status; }, connection = connection
+    let n = data.updateTask ({ task with ExecutedAt = None; TimeElasped = None; Status = status; }, connection = connection)
     return 1
   else
-    printfn "Processing task: Id: %A; QueueName: %A; Type: %A" task.Id task.QueueName task.Type
+    printfn "Processing task: Id: %A; QueueName: %A; Type: %A; PrevTaskId: %A" task.Id task.QueueName task.Type task.PrevTaskId
     // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
     // Emulate task running
     do! Async.Sleep(1000)
     let timeElapsed = DateTime.Now - executedAt
-    let retryCount = task.RetryCount - 1
     let failed =
       task.Payload
       |> Option.bind (fun jo ->
           jo.GetValue("autoFail") |> Option.ofObjForce |> Option.map (fun token -> token.Type = JTokenType.Boolean && token.Value<bool>())
       )
       |> Option.defaultValue false
-    let status = if not failed then "COMPLETED" else if retryCount <= 0 then "FAILED" else "QUEUED"
+    let status = if not failed then "COMPLETED" else "FAILED"
+    let n = data.updateTask ({ task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status }, connection = connection)
     match status with
-    | "FAILED" -> printfn "Task failed and is not being reattempted."
-    | "QUEUED" -> printfn "Task failed and is being requeued."
+    | "FAILED" when task.RetryCount > 0 ->
+      let retryCount = task.RetryCount - 1
+      let n = data.createTaskFromFailedTask ({ task with RetryCount = retryCount; }, connection)
+      printfn "Task failed and is being requeued."
+    | "FAILED" ->
+      printfn "Task failed and is not being reattempted."
     | _ -> () // No action needed for other statuses
-    let n = data.updateTask { task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status; RetryCount = retryCount; }, connection = connection
     return if status = "FAILED" then 1 else 0
 }
 
