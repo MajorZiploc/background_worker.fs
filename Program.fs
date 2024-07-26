@@ -162,7 +162,7 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async
   if not shouldRun then
     printfn "Program is not valid for the machine. task.MachineName: %A; task.ValidProgramMachineName: %A" task.MachineName task.ValidProgramMachineName
     let status = "FAILED"
-    let n = data.updateTask ({ task with ExecutedAt = None; TimeElasped = None; Status = status; }, connection = connection)
+    let n = data.updateTask ({ task with ExecutedAt = None; TimeElasped = None; Status = status; }, connection)
     return 1
   else
     printfn "Processing task: Id: %A; QueueName: %A; Type: %A; PrevTaskId: %A" task.Id task.QueueName task.Type task.PrevTaskId
@@ -177,7 +177,7 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async
       )
       |> Option.defaultValue false
     let status = if not failed then "COMPLETED" else "FAILED"
-    let n = data.updateTask ({ task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status }, connection = connection)
+    let n = data.updateTask ({ task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status }, connection)
     match status with
     | "FAILED" when task.RetryCount > 0 ->
       let retryCount = task.RetryCount - 1
