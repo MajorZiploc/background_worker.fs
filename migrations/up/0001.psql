@@ -23,10 +23,12 @@ CREATE TABLE Task (
   prev_task_id uuid NULL,
   CONSTRAINT fk_valid_program
     FOREIGN KEY (valid_program_id)
-    REFERENCES ValidProgram(id),
-  CONSTRAINT fk_last_task_run
-    FOREIGN KEY (prev_task_id)
-    REFERENCES Task(id)
+    REFERENCES ValidProgram(id)
+  -- NOTE: not using this constraint since it makes archiving/deleting data much more difficult
+    -- ,
+  -- CONSTRAINT fk_last_task_run
+    -- FOREIGN KEY (prev_task_id)
+    -- REFERENCES Task(id)
 );
 CREATE INDEX idx_task_status ON Task(status);
 CREATE INDEX idx_task_queue_name ON Task(queue_name);
