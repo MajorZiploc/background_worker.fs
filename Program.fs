@@ -13,8 +13,8 @@ type Task = {
   Payload: JObject option
   ValidProgramId: Guid
   ProgramPath: string option
-  ProgramType: string
-  ValidProgramMachineName: string
+  ProgramType: string option
+  ValidProgramMachineName: string option
   CreatedAt: DateTime
   ExecutedAt: DateTime option
   TimeElasped: TimeSpan option
@@ -67,7 +67,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         , t.retry_count
         , t.prev_task_id
       from Task as t
-      inner join ValidProgram as vp on t.valid_program_id = vp.id
+      left join ValidProgram as vp on t.valid_program_id = vp.id
       where
         t.status = 'QUEUED'
         and t.queue_name = any(@Queues)
@@ -86,8 +86,8 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         Status = read.text "status"
         ValidProgramId = read.uuid "valid_program_id"
         ProgramPath = read.textOrNone "program_path"
-        ProgramType = read.text "program_type"
-        ValidProgramMachineName = read.text "valid_program_machine_name"
+        ProgramType = read.textOrNone "program_type"
+        ValidProgramMachineName = read.textOrNone "valid_program_machine_name"
         Payload = read.textOrNone "payload" |> Option.map JObject.Parse
         CreatedAt = read.dateTime "created_at"
         ExecutedAt = read.dateTimeOrNone "executed_at"
@@ -158,7 +158,9 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
 
 let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async {
   let executedAt = DateTime.Now
-  let shouldRun = task.ValidProgramMachineName = task.MachineName
+  let shouldRun =
+    (task.ValidProgramMachineName |> Option.map ((=) task.MachineName) |? false)
+    && (task.ProgramType |> Option.isSome)
   if not shouldRun then
     printfn "Program is not valid for the machine. task.MachineName: %A; task.ValidProgramMachineName: %A" task.MachineName task.ValidProgramMachineName
     let status = "FAILED"
