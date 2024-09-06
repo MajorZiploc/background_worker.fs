@@ -18,7 +18,7 @@ type Task = {
   CreatedAt: DateTime
   RunnableAt: DateTime
   ExecutedAt: DateTime option
-  TimeElasped: TimeSpan option
+  TimeElapsed: TimeSpan option
   AttemptCount: int
   RetryCount: int
 }
@@ -95,7 +95,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         CreatedAt = read.dateTime "created_at"
         RunnableAt = read.dateTime "runnable_at"
         ExecutedAt = read.dateTimeOrNone "executed_at"
-        TimeElasped = read.intervalOrNone "time_elapsed"
+        TimeElapsed = read.intervalOrNone "time_elapsed"
         AttemptCount = read.int "attempt_count"
         RetryCount = read.int "retry_count"
       })
@@ -104,7 +104,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
     let parameters = [
       ("@Id", Sql.uuid task.Id);
       ("@ExecutedAt", Sql.timestampOrNone task.ExecutedAt);
-      ("@TimeElasped", Sql.intervalOrNone task.TimeElasped);
+      ("@TimeElapsed", Sql.intervalOrNone task.TimeElapsed);
       ("@Status", Sql.text task.Status);
       ("@AttemptCount", Sql.int task.AttemptCount);
       ("@RunnableAt", Sql.timestamp task.RunnableAt);
@@ -112,7 +112,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
     let sql = $"""
       update Task set
         executed_at = @ExecutedAt
-        , time_elapsed = @TimeElasped
+        , time_elapsed = @TimeElapsed
         , status = @Status
         , attempt_count = @AttemptCount
         , runnable_at = @RunnableAt
@@ -138,7 +138,7 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async
   if not shouldRun then
     printfn "Program is not valid for the machine. task.MachineName: %A; task.ValidProgramMachineName: %A" task.MachineName task.ValidProgramMachineName
     let status = "FAILED"
-    let n = data.updateTask ({ task with ExecutedAt = None; TimeElasped = None; Status = status; }, connection)
+    let n = data.updateTask ({ task with ExecutedAt = None; TimeElapsed = None; Status = status; }, connection)
     return 1
   else
     printfn "Processing task: Id: %A; QueueName: %A; Type: %A;" task.Id task.QueueName task.Type
@@ -154,7 +154,7 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async
       )
       |> Option.defaultValue false
     let status = if not failed then "COMPLETED" else "FAILED"
-    let n = data.updateTask ({ task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status }, connection)
+    let n = data.updateTask ({ task with ExecutedAt = executedAt |> Some; TimeElapsed = timeElapsed |> Some; Status = status }, connection)
     match status with
     | "FAILED" when task.RetryCount > 0 && task.AttemptCount < task.RetryCount ->
       let attemptCount = task.AttemptCount + 1
