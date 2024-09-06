@@ -1,9 +1,12 @@
 select
-  *
-from Task
--- where
---   status = 'QUEUED'
---   and executed_at is not null
+  NOW()
+  , runnable_at
+  , *
+from TaskEntry
+where
+  status = 'QUEUED'
+  -- and runnable_at < NOW()
+  -- and executed_at is not null
 ;
 
 
@@ -13,9 +16,9 @@ from ValidProgram
 ;
 
 
--- truncate table Task;
+-- truncate table TaskEntry;
 
--- drop table Task;
+-- drop table TaskEntry;
 
 
 INSERT INTO ValidProgram (machine_name, program_path, program_type)
@@ -34,7 +37,7 @@ VALUES
 
 
 
-INSERT INTO Task (machine_name, queue_name, type, status, payload, valid_program_id, executed_at, time_elapsed, retry_count)
+INSERT INTO TaskEntry (machine_name, queue_name, type, status, payload, valid_program_id, executed_at, time_elapsed, retry_count)
 VALUES
 (
   'task_master',
@@ -123,5 +126,20 @@ VALUES
   null,
   null,
   0
+)
+;
+
+INSERT INTO TaskEntry (machine_name, queue_name, type, status, payload, valid_program_id, executed_at, time_elapsed, retry_count)
+VALUES
+(
+  'task_master',
+  'internal',
+  'sync-with-partner1',
+  'QUEUED',
+  '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  null,
+  null,
+  10
 )
 ;

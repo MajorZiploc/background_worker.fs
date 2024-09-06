@@ -4,7 +4,7 @@ open Newtonsoft.Json.Linq
 open Npgsql.FSharp
 open System.Threading
 
-type Task = {
+type TaskEntry = {
   Id: Guid
   MachineName: string
   QueueName: string
@@ -68,7 +68,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         , t.time_elapsed
         , t.attempt_count
         , t.retry_count
-      from Task as t
+      from TaskEntry as t
       left join ValidProgram as vp on t.valid_program_id = vp.id
       where
         t.status = 'QUEUED'
@@ -100,17 +100,17 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         RetryCount = read.int "retry_count"
       })
 
-  member this.updateTask (task: Task, ?connection: Sql.SqlProps) =
+  member this.updateTask (taskEntry: TaskEntry, ?connection: Sql.SqlProps) =
     let parameters = [
-      ("@Id", Sql.uuid task.Id);
-      ("@ExecutedAt", Sql.timestampOrNone task.ExecutedAt);
-      ("@TimeElapsed", Sql.intervalOrNone task.TimeElapsed);
-      ("@Status", Sql.text task.Status);
-      ("@AttemptCount", Sql.int task.AttemptCount);
-      ("@RunnableAt", Sql.timestamp task.RunnableAt);
+      ("@Id", Sql.uuid taskEntry.Id);
+      ("@ExecutedAt", Sql.timestampOrNone taskEntry.ExecutedAt);
+      ("@TimeElapsed", Sql.intervalOrNone taskEntry.TimeElapsed);
+      ("@Status", Sql.text taskEntry.Status);
+      ("@AttemptCount", Sql.int taskEntry.AttemptCount);
+      ("@RunnableAt", Sql.timestamp taskEntry.RunnableAt);
     ]
     let sql = $"""
-      update Task set
+      update TaskEntry set
         executed_at = @ExecutedAt
         , time_elapsed = @TimeElapsed
         , status = @Status
@@ -123,43 +123,43 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
     |> Sql.parameters parameters
     |> Sql.executeNonQuery
 
-let getNextRunnableDate (task: Task) =
+let getNextRunnableDate (taskEntry: TaskEntry) =
   let baseDelay = TimeSpan.FromSeconds(5.0)
-  let delay = baseDelay * Math.Pow(2.0, float task.AttemptCount)
+  let delay = baseDelay * Math.Pow(2.0, float taskEntry.AttemptCount)
   let maxDelay = TimeSpan.FromMinutes(10.0)
   let actualDelay = min delay.TotalSeconds maxDelay.TotalSeconds |> TimeSpan.FromSeconds
   DateTime.Now.Add(actualDelay)
 
-let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async {
+let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntry) = async {
   let executedAt = DateTime.Now
   let shouldRun =
-    (task.ValidProgramMachineName |> Option.map ((=) task.MachineName) |? false)
-    && (task.ProgramType |> Option.isSome)
+    (taskEntry.ValidProgramMachineName |> Option.map ((=) taskEntry.MachineName) |? false)
+    && (taskEntry.ProgramType |> Option.isSome)
   if not shouldRun then
-    printfn "Program is not valid for the machine. task.MachineName: %A; task.ValidProgramMachineName: %A" task.MachineName task.ValidProgramMachineName
+    printfn "Program is not valid for the machine. taskEntry.MachineName: %A; taskEntry.ValidProgramMachineName: %A" taskEntry.MachineName taskEntry.ValidProgramMachineName
     let status = "FAILED"
-    let n = data.updateTask ({ task with ExecutedAt = None; TimeElapsed = None; Status = status; }, connection)
+    let n = data.updateTask ({ taskEntry with ExecutedAt = None; TimeElapsed = None; Status = status; }, connection)
     return 1
   else
-    printfn "Processing task: Id: %A; QueueName: %A; Type: %A;" task.Id task.QueueName task.Type
+    printfn "Processing taskEntry: Id: %A; QueueName: %A; Type: %A;" taskEntry.Id taskEntry.QueueName taskEntry.Type
     // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
     // Emulate task running
     do! Async.Sleep(1000)
     let timeElapsed = DateTime.Now - executedAt
     // TODO: remove this mock failed when implementing the true run of tasks
     let failed =
-      task.Payload
+      taskEntry.Payload
       |> Option.bind (fun jo ->
           jo.GetValue("autoFail") |> Option.ofObjForce |> Option.map (fun token -> token.Type = JTokenType.Boolean && token.Value<bool>())
       )
       |> Option.defaultValue false
     let status = if not failed then "COMPLETED" else "FAILED"
-    let n = data.updateTask ({ task with ExecutedAt = executedAt |> Some; TimeElapsed = timeElapsed |> Some; Status = status }, connection)
+    let n = data.updateTask ({ taskEntry with ExecutedAt = executedAt |> Some; TimeElapsed = timeElapsed |> Some; Status = status }, connection)
     match status with
-    | "FAILED" when task.RetryCount > 0 && task.AttemptCount < task.RetryCount ->
-      let attemptCount = task.AttemptCount + 1
-      let runnableAt =  task |> getNextRunnableDate
-      let n = data.updateTask ({ task with AttemptCount = attemptCount; RunnableAt = runnableAt }, connection)
+    | "FAILED" when taskEntry.RetryCount > 0 && taskEntry.AttemptCount < taskEntry.RetryCount ->
+      let attemptCount = taskEntry.AttemptCount + 1
+      let runnableAt =  taskEntry |> getNextRunnableDate
+      let n = data.updateTask ({ taskEntry with AttemptCount = attemptCount; RunnableAt = runnableAt }, connection)
       printfn "Task failed and is being requeued."
     | "FAILED" ->
       printfn "Task failed and is not being reattempted."
