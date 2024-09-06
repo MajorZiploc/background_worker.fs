@@ -16,10 +16,11 @@ type Task = {
   ProgramType: string option
   ValidProgramMachineName: string option
   CreatedAt: DateTime
+  RunnableAt: DateTime
   ExecutedAt: DateTime option
   TimeElasped: TimeSpan option
+  AttemptCount: int
   RetryCount: int
-  PrevTaskId: Guid option
 }
 
 let timeTillNextPollMs = Environment.GetEnvironmentVariable "TIME_TILL_NEXT_POLL_MS" |> int
@@ -62,16 +63,18 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         , vp.program_type
         , vp.machine_name as valid_program_machine_name
         , t.created_at
+        , t.runnable_at
         , t.executed_at
         , t.time_elapsed
+        , t.attempt_count
         , t.retry_count
-        , t.prev_task_id
       from Task as t
       left join ValidProgram as vp on t.valid_program_id = vp.id
       where
         t.status = 'QUEUED'
         and t.queue_name = any(@Queues)
         and t.machine_name = @MachineName
+        and t.runnable_at < NOW()
       limit @TaskCount;
     """
     this.getConnectionWithDefault connection
@@ -90,10 +93,11 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         ValidProgramMachineName = read.textOrNone "valid_program_machine_name"
         Payload = read.textOrNone "payload" |> Option.map JObject.Parse
         CreatedAt = read.dateTime "created_at"
+        RunnableAt = read.dateTime "runnable_at"
         ExecutedAt = read.dateTimeOrNone "executed_at"
         TimeElasped = read.intervalOrNone "time_elapsed"
+        AttemptCount = read.int "attempt_count"
         RetryCount = read.int "retry_count"
-        PrevTaskId = read.uuidOrNone "prev_task_id"
       })
 
   member this.updateTask (task: Task, ?connection: Sql.SqlProps) =
@@ -102,12 +106,16 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
       ("@ExecutedAt", Sql.timestampOrNone task.ExecutedAt);
       ("@TimeElasped", Sql.intervalOrNone task.TimeElasped);
       ("@Status", Sql.text task.Status);
+      ("@AttemptCount", Sql.int task.AttemptCount);
+      ("@RunnableAt", Sql.timestamp task.RunnableAt);
     ]
     let sql = $"""
       update Task set
         executed_at = @ExecutedAt
         , time_elapsed = @TimeElasped
         , status = @Status
+        , attempt_count = @AttemptCount
+        , runnable_at = @RunnableAt
       where id = @Id;
     """
     this.getConnectionWithDefault connection
@@ -115,46 +123,12 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
     |> Sql.parameters parameters
     |> Sql.executeNonQuery
 
-  member this.createTaskFromFailedTask (task: Task, ?connection: Sql.SqlProps) =
-    let parameters = [
-      ("@Id", Sql.uuid task.Id);
-      ("@RetryCount", Sql.int task.RetryCount);
-    ]
-    let sql = $"""
-      insert into Task
-        (
-          machine_name
-          , queue_name
-          , type
-          , status
-          , payload
-          , result
-          , valid_program_id
-          , executed_at
-          , time_elapsed
-          , retry_count
-          , prev_task_id
-        )
-      select
-          t.machine_name
-          , t.queue_name
-          , t.type
-          , 'QUEUED'
-          , t.payload
-          , null
-          , t.valid_program_id
-          , null
-          , null
-          , @RetryCount
-          , @Id
-      from Task as t
-      where t.id = @Id
-      ;
-    """
-    this.getConnectionWithDefault connection
-    |> Sql.query sql
-    |> Sql.parameters parameters
-    |> Sql.executeNonQuery
+let getNextRunnableDate (task: Task) =
+  let baseDelay = TimeSpan.FromSeconds(5.0)
+  let delay = baseDelay * Math.Pow(2.0, float task.AttemptCount)
+  let maxDelay = TimeSpan.FromMinutes(10.0)
+  let actualDelay = min delay.TotalSeconds maxDelay.TotalSeconds |> TimeSpan.FromSeconds
+  DateTime.Now.Add(actualDelay)
 
 let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async {
   let executedAt = DateTime.Now
@@ -167,11 +141,12 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async
     let n = data.updateTask ({ task with ExecutedAt = None; TimeElasped = None; Status = status; }, connection)
     return 1
   else
-    printfn "Processing task: Id: %A; QueueName: %A; Type: %A; PrevTaskId: %A" task.Id task.QueueName task.Type task.PrevTaskId
+    printfn "Processing task: Id: %A; QueueName: %A; Type: %A;" task.Id task.QueueName task.Type
     // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
     // Emulate task running
     do! Async.Sleep(1000)
     let timeElapsed = DateTime.Now - executedAt
+    // TODO: remove this mock failed when implementing the true run of tasks
     let failed =
       task.Payload
       |> Option.bind (fun jo ->
@@ -181,9 +156,10 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (task: Task) = async
     let status = if not failed then "COMPLETED" else "FAILED"
     let n = data.updateTask ({ task with ExecutedAt = executedAt |> Some; TimeElasped = timeElapsed |> Some; Status = status }, connection)
     match status with
-    | "FAILED" when task.RetryCount > 0 ->
-      let retryCount = task.RetryCount - 1
-      let n = data.createTaskFromFailedTask ({ task with RetryCount = retryCount; }, connection)
+    | "FAILED" when task.RetryCount > 0 && task.AttemptCount < task.RetryCount ->
+      let attemptCount = task.AttemptCount + 1
+      let runnableAt =  task |> getNextRunnableDate
+      let n = data.updateTask ({ task with AttemptCount = attemptCount; RunnableAt = runnableAt }, connection)
       printfn "Task failed and is being requeued."
     | "FAILED" ->
       printfn "Task failed and is not being reattempted."
