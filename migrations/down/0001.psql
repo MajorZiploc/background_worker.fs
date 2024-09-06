@@ -1,2 +1,2 @@
-drop table Task;
+drop table TaskEntry;
 drop table ValidProgram;
