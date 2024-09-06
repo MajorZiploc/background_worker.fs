@@ -16,6 +16,7 @@ CREATE TABLE Task (
   payload json NULL,
   valid_program_id uuid NOT NULL,
   created_at timestamp NOT NULL DEFAULT NOW(),
+  runnable_at timestamp NOT NULL DEFAULT NOW(),
   executed_at timestamp NULL,
   time_elapsed interval NULL,
   attempt_count smallint DEFAULT 0,
