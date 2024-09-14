@@ -20,13 +20,47 @@ from ValidProgram
 
 -- drop table TaskEntry;
 
+-- drop table TaskEntry;
+-- drop table ValidProgram;
+
+
+CREATE TABLE ValidProgram (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  machine_name varchar(255) NOT NULL,
+  program_path text NULL,
+  program_command text NOT NULL,
+  created_at timestamp NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_valid_program_queue_name ON ValidProgram(machine_name);
+
+CREATE TABLE TaskEntry (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  machine_name varchar(255) NOT NULL,
+  queue_name varchar(255) NOT NULL,
+  type text NOT NULL,
+  status varchar(50) NOT NULL,
+  payload json NULL,
+  valid_program_id uuid NOT NULL,
+  created_at timestamp NOT NULL DEFAULT NOW(),
+  runnable_at timestamp NOT NULL DEFAULT NOW(),
+  executed_at timestamp NULL,
+  time_elapsed interval NULL,
+  attempt_count smallint DEFAULT 0,
+  retry_count smallint DEFAULT 0,
+  CONSTRAINT fk_valid_program
+    FOREIGN KEY (valid_program_id)
+    REFERENCES ValidProgram(id)
+);
+CREATE INDEX idx_task_status ON TaskEntry(status);
+CREATE INDEX idx_task_queue_name ON TaskEntry(queue_name);
+CREATE INDEX idx_task_machine_name ON TaskEntry(machine_name);
 
 INSERT INTO ValidProgram (machine_name, program_path, program_command)
 VALUES
 (
   'task_master',
-  '/Users/manyu/projects_play/fs_hello_world_task',
-  'dotnet run'
+  '/home/majorziploc/projects_play/fs_hello_world_task',
+  'dotnet'
 ),
 (
   'task_master_2',
@@ -136,8 +170,9 @@ VALUES
   'internal',
   'sync-with-partner1',
   'QUEUED',
-  '{ \"args\": [1, {\"thing\": [1,2,3]}, \"third guy\"] }',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects_play/fs_hello_world_task' limit 1),
+  -- '{ \"args\": [\"run\", {\"thing\": [1,2,3]}, \"third guy\"] }',
+  '{ \"args\": [\"run\"] }',
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/home/majorziploc/projects_play/fs_hello_world_task' limit 1),
   null,
   null,
   3

@@ -240,7 +240,7 @@ let mainAsync (cancellationToken: CancellationToken) = async {
 [<EntryPoint>]
 let main argv =
   // let command = "dotnet"
-  // let workingDir = "/home/majorziploc/projects_play/fs_hello_world"
+  // let workingDir = "/home/majorziploc/projects_play/fs_hello_world_task"
   // let arguments = "run --project ."
   // let output, exitCode = startProcessAndReadOutput command workingDir arguments
   // printfn "%s" output
