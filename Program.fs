@@ -177,11 +177,17 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntr
     return 1
   else
     printfn "Processing taskEntry: Id: %A; QueueName: %A; ProgramCommand: %A;" taskEntry.Id taskEntry.QueueName taskEntry.ProgramCommand
-    let exitCode = processTask (taskEntry.ProgramCommand |? "") (taskEntry.ProgramPath |? "") taskEntry.Payload
-    printfn "%A" exitCode
+    let exitCodeResult = tryResult (fun () -> processTask (taskEntry.ProgramCommand |? "") (taskEntry.ProgramPath |? "") taskEntry.Payload)
     let timeElapsed = DateTime.Now - executedAt
-    let failed = exitCode <> 0
-    let status = if not failed then "COMPLETED" else "FAILED"
+    let exitCodeStatus = exitCodeResult |> Result.map (fun exitCode -> if exitCode <> 0 then "COMPLETED" else "FAILED") |> Result.mapError (fun exn ->
+      // TODO: Add this to central logging
+      printfn "%A" exn
+      "MALFORMED_TASK"
+    )
+    let status =
+      match exitCodeStatus with
+      | Ok v -> v
+      | Error v -> v
     let n = data.updateTask ({ taskEntry with ExecutedAt = executedAt |> Some; TimeElapsed = timeElapsed |> Some; Status = status }, connection)
     match status with
     | "FAILED" when taskEntry.RetryCount > 0 && taskEntry.AttemptCount < taskEntry.RetryCount ->

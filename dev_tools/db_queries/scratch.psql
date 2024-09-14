@@ -62,6 +62,12 @@ VALUES
   '/home/majorziploc/projects_play/fs_hello_world_task',
   'dotnet'
 ),
+-- MALFORMED_TASK
+(
+  'task_master',
+  '/home/majorziploc/projects_play/fs_hello_world_task',
+  'dotnet run'
+),
 (
   'task_master_2',
   '/Users/manyu/projects/tooling_notes/fs_prac',
@@ -173,6 +179,19 @@ VALUES
   -- '{ \"args\": [\"run\", {\"thing\": [1,2,3]}, \"third guy\"] }',
   '{ \"args\": [\"run\"] }',
   (select id from ValidProgram where machine_name = 'task_master' and program_path = '/home/majorziploc/projects_play/fs_hello_world_task' limit 1),
+  null,
+  null,
+  3
+),
+-- MALFORMED_TASK
+(
+  'task_master',
+  'internal',
+  'sync-with-partner1',
+  'QUEUED',
+  -- '{ \"args\": [\"run\", {\"thing\": [1,2,3]}, \"third guy\"] }',
+  '{ \"args\": [\"run\"] }',
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/home/majorziploc/projects_play/fs_hello_world_task' and program_command = 'dotnet run' limit 1),
   null,
   null,
   3
