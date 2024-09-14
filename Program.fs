@@ -1,4 +1,5 @@
 open System
+open System.Diagnostics
 open Acadian.FSharp
 open Newtonsoft.Json.Linq
 open Npgsql.FSharp
@@ -196,12 +197,31 @@ let mainAsync (cancellationToken: CancellationToken) = async {
   return 0
 }
 
+let startProcessAndReadOutput (command: string) (workingDir: string) (arguments: string) =
+  let processor = new Process()
+  processor.StartInfo.FileName <- command
+  processor.StartInfo.Arguments <- arguments
+  processor.StartInfo.WorkingDirectory <- workingDir
+  processor.StartInfo.RedirectStandardOutput <- true
+  processor.StartInfo.UseShellExecute <- false
+  processor.Start() |> ignore
+  let output = processor.StandardOutput.ReadToEnd()
+  processor.WaitForExit() // Ensure the process exits before reading output
+  output
+
 [<EntryPoint>]
 let main argv =
-  let cts = new CancellationTokenSource()
-  Console.CancelKeyPress.Add(fun _ ->
-    cts.Cancel()
-    printfn "Shutting down..."
-  )
-  Async.RunSynchronously (mainAsync cts.Token)
+  let command = "dotnet"
+  let workingDir = "/home/majorziploc/projects_play/fs_hello_world"
+  let arguments = "run"
+  let output = startProcessAndReadOutput command workingDir arguments
+  printfn "%s" output
+  0
+
+  // let cts = new CancellationTokenSource()
+  // Console.CancelKeyPress.Add(fun _ ->
+  //   cts.Cancel()
+  //   printfn "Shutting down..."
+  // )
+  // Async.RunSynchronously (mainAsync cts.Token)
 
