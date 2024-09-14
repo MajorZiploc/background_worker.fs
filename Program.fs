@@ -213,7 +213,12 @@ let startProcessAndReadOutput (command: string) (workingDir: string) (arguments:
 let main argv =
   let command = "dotnet"
   let workingDir = "/home/majorziploc/projects_play/fs_hello_world"
-  let arguments = "run"
+  let arguments = "run --project ."
+  let output = startProcessAndReadOutput command workingDir arguments
+  printfn "%s" output
+  let command = "powershell.exe"
+  let workingDir = "/home/majorziploc/"
+  let arguments = "ls"
   let output = startProcessAndReadOutput command workingDir arguments
   printfn "%s" output
   0
