@@ -1,4 +1,5 @@
 open System
+open System.Diagnostics
 open Acadian.FSharp
 open Newtonsoft.Json.Linq
 open Npgsql.FSharp
@@ -130,6 +131,41 @@ let getNextRunnableDate (taskEntry: TaskEntry) =
   let actualDelay = min delay.TotalSeconds maxDelay.TotalSeconds |> TimeSpan.FromSeconds
   DateTime.Now.Add(actualDelay)
 
+let parseTaskArgs (arguments: JObject option) =
+  arguments
+  |> Option.bind (fun args ->
+    // Try to get the 'args' key and check if it's an array
+    match args.TryGetValue("args") with
+    | true, (:? JArray as m) ->
+      let stringArgs =
+        m |> Seq.map (function
+          | :? JValue as v -> v.ToString() // Handle int, string, etc.
+          | obj -> sprintf "'%A'" (obj.ToString()) // Handle JObject or other types
+        )
+        |> String.concat " "
+      Some stringArgs
+    | _ -> None
+  )
+
+let processTask (command: string) (workingDir: string) (arguments: JObject option) =
+  let processor = new Process()
+  processor.StartInfo.FileName <- command
+  let args = parseTaskArgs arguments
+  match args with
+  | Some a -> processor.StartInfo.Arguments <- a
+  | None -> ()
+  processor.StartInfo.WorkingDirectory <- workingDir
+  processor.StartInfo.RedirectStandardOutput <- true
+  processor.StartInfo.UseShellExecute <- false
+  // TODO: look into if this boolean is relative for the background_worker
+  processor.Start() |> ignore
+  // let output = processor.StandardOutput.ReadToEnd()
+  // printfn "%A" output
+  processor.WaitForExit()
+  let exitCode = processor.ExitCode
+  // output, exitCode
+  exitCode
+
 let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntry) = async {
   let executedAt = DateTime.Now
   let shouldRun =
@@ -142,18 +178,17 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntr
     return 1
   else
     printfn "Processing taskEntry: Id: %A; QueueName: %A; ProgramCommand: %A;" taskEntry.Id taskEntry.QueueName taskEntry.ProgramCommand
-    // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
-    // Emulate task running
-    do! Async.Sleep(1000)
+    let exitCodeResult = tryResult (fun () -> processTask (taskEntry.ProgramCommand |? "") (taskEntry.ProgramPath |? "") taskEntry.Payload)
     let timeElapsed = DateTime.Now - executedAt
-    // TODO: remove this mock failed when implementing the true run of tasks
-    let failed =
-      taskEntry.Payload
-      |> Option.bind (fun jo ->
-          jo.GetValue("autoFail") |> Option.ofObjForce |> Option.map (fun token -> token.Type = JTokenType.Boolean && token.Value<bool>())
-      )
-      |> Option.defaultValue false
-    let status = if not failed then "COMPLETED" else "FAILED"
+    let exitCodeStatus = exitCodeResult |> Result.map (fun exitCode -> if exitCode <> 0 then "COMPLETED" else "FAILED") |> Result.mapError (fun exn ->
+      // TODO: Add this to central logging
+      printfn "%A" exn
+      "MALFORMED_TASK"
+    )
+    let status =
+      match exitCodeStatus with
+      | Ok v -> v
+      | Error v -> v
     let n = data.updateTask ({ taskEntry with ExecutedAt = executedAt |> Some; TimeElapsed = timeElapsed |> Some; Status = status }, connection)
     match status with
     | "FAILED" when taskEntry.RetryCount > 0 && taskEntry.AttemptCount < taskEntry.RetryCount ->

@@ -3,7 +3,7 @@ export POSTGRES_PASSWORD='password'
 export POSTGRES_PORT=5432
 export POSTGRES_DB="postgres"
 # naming convertion of the above vars but for the db container
-export PGHOST='pgsql'
+export PGHOST='127.0.0.1'
 export PGUSER='postgres'
 export PGPASSWORD='password'
 export PGPORT=5432
