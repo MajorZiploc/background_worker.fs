@@ -21,12 +21,12 @@ from ValidProgram
 -- drop table TaskEntry;
 
 
-INSERT INTO ValidProgram (machine_name, program_path, program_type)
+INSERT INTO ValidProgram (machine_name, program_path, program_command)
 VALUES
 (
   'task_master',
-  '/Users/manyu/projects/tooling_notes/fs_prac',
-  'dotnet-cli'
+  '/Users/manyu/projects_play/fs_hello_world_task',
+  'dotnet run'
 ),
 (
   'task_master_2',
@@ -45,7 +45,7 @@ VALUES
   'sync-with-partner2',
   'COMPLETED',
   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_command = 'dotnet-cli' limit 1),
   NOW() - INTERVAL '1 day',
   INTERVAL '1 day 2 hours',
   0
@@ -56,7 +56,7 @@ VALUES
   'sync-with-partner1',
   'QUEUED',
   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_command = 'dotnet-cli' limit 1),
   null,
   null,
   0
@@ -67,7 +67,7 @@ VALUES
   'sync-with-partner1',
   'QUEUED',
   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_command = 'dotnet-cli' limit 1),
   null,
   null,
   0
@@ -78,7 +78,7 @@ VALUES
   'sync-with-partner2',
   'QUEUED',
   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_command = 'dotnet-cli' limit 1),
   null,
   null,
   2
@@ -89,7 +89,7 @@ VALUES
   'sync-with-partner2',
   'QUEUED',
   '{ \"customer\": \"John Smith\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_command = 'dotnet-cli' limit 1),
   null,
   null,
   2
@@ -100,7 +100,7 @@ VALUES
   'sync-with-partner2',
   'QUEUED',
   '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_command = 'dotnet-cli' limit 1),
   null,
   null,
   2
@@ -111,7 +111,7 @@ VALUES
   'sync-with-partner2',
   'QUEUED',
   '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_command = 'dotnet-cli' limit 1),
   null,
   null,
   0
@@ -122,7 +122,7 @@ VALUES
   'sync-with-partner1',
   'QUEUED',
   '{ \"customer\": \"Alex Cross\", \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_command = 'dotnet-cli' limit 1),
   null,
   null,
   0
@@ -137,9 +137,9 @@ VALUES
   'sync-with-partner1',
   'QUEUED',
   '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_type = 'dotnet-cli' limit 1),
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_command = 'dotnet-cli' limit 1),
   null,
   null,
-  10
+  3
 )
 ;

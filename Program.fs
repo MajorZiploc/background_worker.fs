@@ -13,7 +13,7 @@ type TaskEntry = {
   Payload: JObject option
   ValidProgramId: Guid
   ProgramPath: string option
-  ProgramType: string option
+  ProgramCommand: string option
   ValidProgramMachineName: string option
   CreatedAt: DateTime
   RunnableAt: DateTime
@@ -55,12 +55,12 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         t.id
         , t.machine_name
         , t.queue_name
-        , t.type
+        , t.Type
         , t.status
         , t.payload
         , t.valid_program_id
         , vp.program_path
-        , vp.program_type
+        , vp.program_command
         , vp.machine_name as valid_program_machine_name
         , t.created_at
         , t.runnable_at
@@ -89,7 +89,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         Status = read.text "status"
         ValidProgramId = read.uuid "valid_program_id"
         ProgramPath = read.textOrNone "program_path"
-        ProgramType = read.textOrNone "program_type"
+        ProgramCommand = read.textOrNone "program_command"
         ValidProgramMachineName = read.textOrNone "valid_program_machine_name"
         Payload = read.textOrNone "payload" |> Option.map JObject.Parse
         CreatedAt = read.dateTime "created_at"
@@ -134,14 +134,14 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntr
   let executedAt = DateTime.Now
   let shouldRun =
     (taskEntry.ValidProgramMachineName |> Option.map ((=) taskEntry.MachineName) |? false)
-    && (taskEntry.ProgramType |> Option.isSome)
+    && (taskEntry.ProgramCommand |> Option.isSome)
   if not shouldRun then
     printfn "Program is not valid for the machine. taskEntry.MachineName: %A; taskEntry.ValidProgramMachineName: %A" taskEntry.MachineName taskEntry.ValidProgramMachineName
     let status = "FAILED"
     let n = data.updateTask ({ taskEntry with ExecutedAt = None; TimeElapsed = None; Status = status; }, connection)
     return 1
   else
-    printfn "Processing taskEntry: Id: %A; QueueName: %A; Type: %A;" taskEntry.Id taskEntry.QueueName taskEntry.Type
+    printfn "Processing taskEntry: Id: %A; QueueName: %A; ProgramCommand: %A;" taskEntry.Id taskEntry.QueueName taskEntry.ProgramCommand
     // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
     // Emulate task running
     do! Async.Sleep(1000)
