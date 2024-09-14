@@ -1,4 +1,5 @@
 open System
+open System.Diagnostics
 open Acadian.FSharp
 open Newtonsoft.Json.Linq
 open Npgsql.FSharp
@@ -13,7 +14,7 @@ type TaskEntry = {
   Payload: JObject option
   ValidProgramId: Guid
   ProgramPath: string option
-  ProgramType: string option
+  ProgramCommand: string option
   ValidProgramMachineName: string option
   CreatedAt: DateTime
   RunnableAt: DateTime
@@ -55,12 +56,12 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         t.id
         , t.machine_name
         , t.queue_name
-        , t.type
+        , t.Type
         , t.status
         , t.payload
         , t.valid_program_id
         , vp.program_path
-        , vp.program_type
+        , vp.program_command
         , vp.machine_name as valid_program_machine_name
         , t.created_at
         , t.runnable_at
@@ -89,7 +90,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         Status = read.text "status"
         ValidProgramId = read.uuid "valid_program_id"
         ProgramPath = read.textOrNone "program_path"
-        ProgramType = read.textOrNone "program_type"
+        ProgramCommand = read.textOrNone "program_command"
         ValidProgramMachineName = read.textOrNone "valid_program_machine_name"
         Payload = read.textOrNone "payload" |> Option.map JObject.Parse
         CreatedAt = read.dateTime "created_at"
@@ -130,30 +131,63 @@ let getNextRunnableDate (taskEntry: TaskEntry) =
   let actualDelay = min delay.TotalSeconds maxDelay.TotalSeconds |> TimeSpan.FromSeconds
   DateTime.Now.Add(actualDelay)
 
+let parseTaskArgs (arguments: JObject option) =
+  arguments
+  |> Option.bind (fun args ->
+    match args.TryGetValue("args") with
+    | true, (:? JArray as m) ->
+      let stringArgs =
+        m |> Seq.map (function
+          | :? JValue as v -> v.ToString() // Handle int, string, etc.
+          | obj -> sprintf "'%A'" (obj.ToString()) // Handle JObject or other types
+        )
+        |> String.concat " "
+      Some stringArgs
+    | _ -> None
+  )
+
+let processTask (command: string) (workingDir: string) (arguments: JObject option) =
+  let processor = new Process()
+  processor.StartInfo.FileName <- command
+  let args = parseTaskArgs arguments
+  match args with
+  | Some a -> processor.StartInfo.Arguments <- a
+  | None -> ()
+  processor.StartInfo.WorkingDirectory <- workingDir
+  processor.StartInfo.RedirectStandardOutput <- true
+  processor.StartInfo.UseShellExecute <- false
+  // TODO: look into if this boolean is relative for the background_worker
+  processor.Start() |> ignore
+  // let output = processor.StandardOutput.ReadToEnd()
+  // printfn "%A" output
+  processor.WaitForExit()
+  let exitCode = processor.ExitCode
+  // output, exitCode
+  exitCode
+
 let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntry) = async {
   let executedAt = DateTime.Now
   let shouldRun =
     (taskEntry.ValidProgramMachineName |> Option.map ((=) taskEntry.MachineName) |? false)
-    && (taskEntry.ProgramType |> Option.isSome)
+    && (taskEntry.ProgramCommand |> Option.isSome)
   if not shouldRun then
     printfn "Program is not valid for the machine. taskEntry.MachineName: %A; taskEntry.ValidProgramMachineName: %A" taskEntry.MachineName taskEntry.ValidProgramMachineName
     let status = "FAILED"
     let n = data.updateTask ({ taskEntry with ExecutedAt = None; TimeElapsed = None; Status = status; }, connection)
     return 1
   else
-    printfn "Processing taskEntry: Id: %A; QueueName: %A; Type: %A;" taskEntry.Id taskEntry.QueueName taskEntry.Type
-    // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
-    // Emulate task running
-    do! Async.Sleep(1000)
+    printfn "Processing taskEntry: Id: %A; QueueName: %A; ProgramCommand: %A;" taskEntry.Id taskEntry.QueueName taskEntry.ProgramCommand
+    let exitCodeResult = tryResult (fun () -> processTask (taskEntry.ProgramCommand |? "") (taskEntry.ProgramPath |? "") taskEntry.Payload)
     let timeElapsed = DateTime.Now - executedAt
-    // TODO: remove this mock failed when implementing the true run of tasks
-    let failed =
-      taskEntry.Payload
-      |> Option.bind (fun jo ->
-          jo.GetValue("autoFail") |> Option.ofObjForce |> Option.map (fun token -> token.Type = JTokenType.Boolean && token.Value<bool>())
-      )
-      |> Option.defaultValue false
-    let status = if not failed then "COMPLETED" else "FAILED"
+    let exitCodeStatus = exitCodeResult |> Result.map (fun exitCode -> if exitCode <> 0 then "COMPLETED" else "FAILED") |> Result.mapError (fun exn ->
+      // TODO: Add this to central logging
+      printfn "%A" exn
+      "MALFORMED_TASK"
+    )
+    let status =
+      match exitCodeStatus with
+      | Ok v -> v
+      | Error v -> v
     let n = data.updateTask ({ taskEntry with ExecutedAt = executedAt |> Some; TimeElapsed = timeElapsed |> Some; Status = status }, connection)
     match status with
     | "FAILED" when taskEntry.RetryCount > 0 && taskEntry.AttemptCount < taskEntry.RetryCount ->
