@@ -207,20 +207,23 @@ let startProcessAndReadOutput (command: string) (workingDir: string) (arguments:
   processor.Start() |> ignore
   let output = processor.StandardOutput.ReadToEnd()
   processor.WaitForExit() // Ensure the process exits before reading output
-  output
+  let exitCode = processor.ExitCode
+  output, exitCode
 
 [<EntryPoint>]
 let main argv =
   let command = "dotnet"
   let workingDir = "/home/majorziploc/projects_play/fs_hello_world"
   let arguments = "run --project ."
-  let output = startProcessAndReadOutput command workingDir arguments
+  let output, exitCode = startProcessAndReadOutput command workingDir arguments
   printfn "%s" output
+  printfn "%A" exitCode
   let command = "powershell.exe"
   let workingDir = "/home/majorziploc/"
   let arguments = "ls"
-  let output = startProcessAndReadOutput command workingDir arguments
+  let output, exitCode = startProcessAndReadOutput command workingDir arguments
   printfn "%s" output
+  printfn "%A" exitCode
   0
 
   // let cts = new CancellationTokenSource()
