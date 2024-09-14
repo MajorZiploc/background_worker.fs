@@ -179,7 +179,7 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntr
     printfn "Processing taskEntry: Id: %A; QueueName: %A; ProgramCommand: %A;" taskEntry.Id taskEntry.QueueName taskEntry.ProgramCommand
     let exitCodeResult = tryResult (fun () -> processTask (taskEntry.ProgramCommand |? "") (taskEntry.ProgramPath |? "") taskEntry.Payload)
     let timeElapsed = DateTime.Now - executedAt
-    let exitCodeStatus = exitCodeResult |> Result.map (fun exitCode -> if exitCode <> 0 then "COMPLETED" else "FAILED") |> Result.mapError (fun exn ->
+    let exitCodeStatus = exitCodeResult |> Result.map (fun exitCode -> if exitCode = 0 then "COMPLETED" else "FAILED") |> Result.mapError (fun exn ->
       // TODO: Add this to central logging
       printfn "%A" exn
       "MALFORMED_TASK"
