@@ -131,6 +131,40 @@ let getNextRunnableDate (taskEntry: TaskEntry) =
   let actualDelay = min delay.TotalSeconds maxDelay.TotalSeconds |> TimeSpan.FromSeconds
   DateTime.Now.Add(actualDelay)
 
+let parseTaskArgs (arguments: JObject option) =
+  arguments
+  |> Option.bind (fun args ->
+    // Try to get the 'args' key and check if it's an array
+    match args.TryGetValue("args") with
+    | true, (:? JArray as m) ->
+      let stringArgs =
+        m |> Seq.map (function
+          | :? JValue as v -> v.ToString() // Handle int, string, etc.
+          | obj -> obj.ToString() // Handle JObject or other types
+        )
+        |> String.concat " "
+      Some stringArgs
+    | _ -> None
+  )
+
+let processTask (command: string) (workingDir: string) (arguments: JObject option) =
+  let processor = new Process()
+  processor.StartInfo.FileName <- command
+  let args = parseTaskArgs arguments
+  match args with
+  | Some a -> processor.StartInfo.Arguments <- a
+  | None -> ()
+  processor.StartInfo.WorkingDirectory <- workingDir
+  processor.StartInfo.RedirectStandardOutput <- true
+  processor.StartInfo.UseShellExecute <- false
+  // TODO: look into if this boolean is relative for the background_worker
+  processor.Start() |> ignore
+  // let output = processor.StandardOutput.ReadToEnd()
+  processor.WaitForExit()
+  let exitCode = processor.ExitCode
+  // output, exitCode
+  exitCode
+
 let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntry) = async {
   let executedAt = DateTime.Now
   let shouldRun =
@@ -143,17 +177,10 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntr
     return 1
   else
     printfn "Processing taskEntry: Id: %A; QueueName: %A; ProgramCommand: %A;" taskEntry.Id taskEntry.QueueName taskEntry.ProgramCommand
-    // TODO: how to handle failed tasks? will likely be different based on if we call an exe or ps1 or if the function exists in this project
-    // Emulate task running
-    do! Async.Sleep(1000)
+    let exitCode = processTask (taskEntry.ProgramCommand |? "") (taskEntry.ProgramPath |? "") taskEntry.Payload
+    printfn "%A" exitCode
     let timeElapsed = DateTime.Now - executedAt
-    // TODO: remove this mock failed when implementing the true run of tasks
-    let failed =
-      taskEntry.Payload
-      |> Option.bind (fun jo ->
-          jo.GetValue("autoFail") |> Option.ofObjForce |> Option.map (fun token -> token.Type = JTokenType.Boolean && token.Value<bool>())
-      )
-      |> Option.defaultValue false
+    let failed = exitCode <> 0
     let status = if not failed then "COMPLETED" else "FAILED"
     let n = data.updateTask ({ taskEntry with ExecutedAt = executedAt |> Some; TimeElapsed = timeElapsed |> Some; Status = status }, connection)
     match status with
@@ -197,39 +224,38 @@ let mainAsync (cancellationToken: CancellationToken) = async {
   return 0
 }
 
-let startProcessAndReadOutput (command: string) (workingDir: string) (arguments: string) =
-  let processor = new Process()
-  processor.StartInfo.FileName <- command
-  processor.StartInfo.Arguments <- arguments
-  processor.StartInfo.WorkingDirectory <- workingDir
-  processor.StartInfo.RedirectStandardOutput <- true
-  processor.StartInfo.UseShellExecute <- false
-  processor.Start() |> ignore
-  let output = processor.StandardOutput.ReadToEnd()
-  processor.WaitForExit() // Ensure the process exits before reading output
-  let exitCode = processor.ExitCode
-  output, exitCode
+// let startProcessAndReadOutput (command: string) (workingDir: string) (arguments: string) =
+//   let processor = new Process()
+//   processor.StartInfo.FileName <- command
+//   processor.StartInfo.Arguments <- arguments
+//   processor.StartInfo.WorkingDirectory <- workingDir
+//   processor.StartInfo.RedirectStandardOutput <- true
+//   processor.StartInfo.UseShellExecute <- false
+//   processor.Start() |> ignore
+//   let output = processor.StandardOutput.ReadToEnd()
+//   processor.WaitForExit() // Ensure the process exits before reading output
+//   let exitCode = processor.ExitCode
+//   output, exitCode
 
 [<EntryPoint>]
 let main argv =
-  let command = "dotnet"
-  let workingDir = "/home/majorziploc/projects_play/fs_hello_world"
-  let arguments = "run --project ."
-  let output, exitCode = startProcessAndReadOutput command workingDir arguments
-  printfn "%s" output
-  printfn "%A" exitCode
-  let command = "powershell.exe"
-  let workingDir = "/home/majorziploc/"
-  let arguments = "ls"
-  let output, exitCode = startProcessAndReadOutput command workingDir arguments
-  printfn "%s" output
-  printfn "%A" exitCode
-  0
-
-  // let cts = new CancellationTokenSource()
-  // Console.CancelKeyPress.Add(fun _ ->
-  //   cts.Cancel()
-  //   printfn "Shutting down..."
-  // )
-  // Async.RunSynchronously (mainAsync cts.Token)
+  // let command = "dotnet"
+  // let workingDir = "/home/majorziploc/projects_play/fs_hello_world"
+  // let arguments = "run --project ."
+  // let output, exitCode = startProcessAndReadOutput command workingDir arguments
+  // printfn "%s" output
+  // printfn "%A" exitCode
+  // let command = "powershell.exe"
+  // let workingDir = "/home/majorziploc/"
+  // let arguments = "ls"
+  // let output, exitCode = startProcessAndReadOutput command workingDir arguments
+  // printfn "%s" output
+  // printfn "%A" exitCode
+  // 0
+  let cts = new CancellationTokenSource()
+  Console.CancelKeyPress.Add(fun _ ->
+    cts.Cancel()
+    printfn "Shutting down..."
+  )
+  Async.RunSynchronously (mainAsync cts.Token)
 

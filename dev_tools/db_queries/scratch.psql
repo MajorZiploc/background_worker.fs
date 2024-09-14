@@ -136,8 +136,8 @@ VALUES
   'internal',
   'sync-with-partner1',
   'QUEUED',
-  '{ \"autoFail\": true, \"items\": {\"product\": \"Tea\",\"qty\": 6}}',
-  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects/tooling_notes/fs_prac' and program_command = 'dotnet-cli' limit 1),
+  '{ \"args\": [1, {\"thing\": [1,2,3]}, \"third guy\"] }',
+  (select id from ValidProgram where machine_name = 'task_master' and program_path = '/Users/manyu/projects_play/fs_hello_world_task' limit 1),
   null,
   null,
   3
