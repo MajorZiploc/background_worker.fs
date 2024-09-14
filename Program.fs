@@ -134,7 +134,6 @@ let getNextRunnableDate (taskEntry: TaskEntry) =
 let parseTaskArgs (arguments: JObject option) =
   arguments
   |> Option.bind (fun args ->
-    // Try to get the 'args' key and check if it's an array
     match args.TryGetValue("args") with
     | true, (:? JArray as m) ->
       let stringArgs =
