@@ -13,5 +13,6 @@ export PGDATALOCAL="/tmp/background_worker-fs_pgsql"
 
 export QUEUES="main,internal,external"
 export MACHINE_NAME="task_master"
-export TIME_TILL_NEXT_POLL_MS=3000
+export MIN_TIME_TILL_NEXT_POLL_MS=3000
+export MAX_TIME_TILL_NEXT_POLL_MS=300000
 export TASK_COUNT=20

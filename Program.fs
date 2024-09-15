@@ -24,7 +24,8 @@ type TaskEntry = {
   RetryCount: int
 }
 
-let timeTillNextPollMs = Environment.GetEnvironmentVariable "TIME_TILL_NEXT_POLL_MS" |> int
+let minTimeTillNextPollMs = Environment.GetEnvironmentVariable "MIN_TIME_TILL_NEXT_POLL_MS" |> int
+let maxTimeTillNextPollMs = Environment.GetEnvironmentVariable "MAX_TIME_TILL_NEXT_POLL_MS" |> int
 
 let queues = (Environment.GetEnvironmentVariable "QUEUES").Split ","
 let machineName = Environment.GetEnvironmentVariable "MACHINE_NAME"
@@ -201,7 +202,15 @@ let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntr
     return if status = "FAILED" then 1 else 0
 }
 
+let updatePollingInterval (interval: int) =
+  let now = DateTime.Now.TimeOfDay
+  if now.Hours >= 9 && now.Hours <= 17 then
+    min interval minTimeTillNextPollMs
+  else
+    min (interval * 2) maxTimeTillNextPollMs
+
 let processQueue (cancellationToken: CancellationToken) = async {
+  let mutable interval = minTimeTillNextPollMs
   let data = Data(connectionString, queues, taskCount, machineName)
   while not cancellationToken.IsCancellationRequested do
     try
@@ -210,7 +219,8 @@ let processQueue (cancellationToken: CancellationToken) = async {
       match tasks with
       | [] ->
         printfn "Nothing in queue"
-        do! Async.Sleep(timeTillNextPollMs)
+        interval <- updatePollingInterval interval
+        do! Async.Sleep(interval)
       | _ ->
         let beginOfProcessing = DateTime.Now
         printfn "Processing queue"
@@ -218,11 +228,12 @@ let processQueue (cancellationToken: CancellationToken) = async {
         let! _ = work |> Async.Sequential
         let endOfProcessing = DateTime.Now
         let deltaTimeTillNextPollMs = endOfProcessing - beginOfProcessing
-        do! Async.Sleep(max (timeTillNextPollMs - deltaTimeTillNextPollMs.Milliseconds) 1000)
+        interval <- minTimeTillNextPollMs
+        do! Async.Sleep(max (interval - deltaTimeTillNextPollMs.Milliseconds) 1000)
     with
     | ex ->
       printfn "Error processing queue: %A" ex
-      do! Async.Sleep(timeTillNextPollMs)
+      do! Async.Sleep(interval)
 }
 
 let mainAsync (cancellationToken: CancellationToken) = async {
