@@ -11,6 +11,7 @@ type TaskEntry = {
   QueueName: string
   Type: string
   Status: string
+  ExitCode: int option
   Payload: JObject option
   ValidProgramId: Guid
   ProgramPath: string option
@@ -59,6 +60,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         , t.queue_name
         , t.Type
         , t.status
+        , t.exit_code
         , t.payload
         , t.valid_program_id
         , vp.program_path
@@ -89,6 +91,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         QueueName = read.text "queue_name"
         Type = read.text "type"
         Status = read.text "status"
+        ExitCode = read.intOrNone "exit_code"
         ValidProgramId = read.uuid "valid_program_id"
         ProgramPath = read.textOrNone "program_path"
         ProgramCommand = read.textOrNone "program_command"
@@ -110,6 +113,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
       ("@Status", Sql.text taskEntry.Status);
       ("@AttemptCount", Sql.int taskEntry.AttemptCount);
       ("@RunnableAt", Sql.timestamptz taskEntry.RunnableAt);
+      ("@ExitCode", Sql.intOrNone taskEntry.ExitCode);
     ]
     let sql = $"""
       update TaskEntry set
@@ -118,6 +122,7 @@ type Data(connectionString: string, queues: string array, taskCount: int, machin
         , status = @Status
         , attempt_count = @AttemptCount
         , runnable_at = @RunnableAt
+        , exit_code = @ExitCode
       where id = @Id;
     """
     this.getConnectionWithDefault connection
@@ -167,39 +172,40 @@ let processTask (command: string) (workingDir: string) (arguments: JObject optio
   exitCode
 
 let executeWorkItem (connection: Sql.SqlProps) (data: Data) (taskEntry: TaskEntry) = async {
+  let mutable taskEntryMut = taskEntry
   let executedAt = DateTime.UtcNow
   let shouldRun =
-    (taskEntry.ValidProgramMachineName |> Option.map ((=) taskEntry.MachineName) |? false)
-    && (taskEntry.ProgramCommand |> Option.isSome)
+    (taskEntryMut.ValidProgramMachineName |> Option.map ((=) taskEntryMut.MachineName) |? false)
+    && (taskEntryMut.ProgramCommand |> Option.isSome)
   if not shouldRun then
-    printfn "Program is not valid for the machine. taskEntry.MachineName: %A; taskEntry.ValidProgramMachineName: %A" taskEntry.MachineName taskEntry.ValidProgramMachineName
+    printfn "Program is not valid for the machine. MachineName: %A; ValidProgramMachineName: %A" taskEntryMut.MachineName taskEntryMut.ValidProgramMachineName
     let status = "FAILED"
-    let n = data.updateTask ({ taskEntry with ExecutedAt = None; TimeElapsed = None; Status = status; }, connection)
-    return 1
+    let n = data.updateTask ({ taskEntryMut with ExecutedAt = None; TimeElapsed = None; Status = status; }, connection)
+    return Some 1
   else
-    printfn "Processing taskEntry: Id: %A; QueueName: %A; ProgramCommand: %A;" taskEntry.Id taskEntry.QueueName taskEntry.ProgramCommand
-    let exitCodeResult = tryResult (fun () -> processTask (taskEntry.ProgramCommand |? "") (taskEntry.ProgramPath |? "") taskEntry.Payload)
+    printfn "Processing TaskEntry: Id: %A; QueueName: %A; ProgramCommand: %A;" taskEntryMut.Id taskEntryMut.QueueName taskEntryMut.ProgramCommand
+    let exitCodeResult = tryResult (fun () -> processTask (taskEntryMut.ProgramCommand |? "") (taskEntryMut.ProgramPath |? "") taskEntryMut.Payload)
     let timeElapsed = DateTime.UtcNow - executedAt
-    let exitCodeStatus = exitCodeResult |> Result.map (fun exitCode -> if exitCode = 0 then "COMPLETED" else "FAILED") |> Result.mapError (fun exn ->
-      // TODO: Add this to central logging
+    let exitCodeStatus = exitCodeResult |> Result.map (fun exitCode -> Some exitCode, if exitCode = 0 then "COMPLETED" else "FAILED") |> Result.mapError (fun exn ->
       printfn "%A" exn
-      "MALFORMED_TASK"
+      None, "MALFORMED_TASK"
     )
-    let status =
+    let statusCodeMeta =
       match exitCodeStatus with
       | Ok v -> v
       | Error v -> v
-    let n = data.updateTask ({ taskEntry with ExecutedAt = executedAt |> Some; TimeElapsed = timeElapsed |> Some; Status = status }, connection)
-    match status with
-    | "FAILED" when taskEntry.RetryCount > 0 && taskEntry.AttemptCount < taskEntry.RetryCount ->
-      let attemptCount = taskEntry.AttemptCount + 1
-      let runnableAt =  taskEntry |> getNextRunnableDate
-      let n = data.updateTask ({ taskEntry with AttemptCount = attemptCount; RunnableAt = runnableAt }, connection)
+    taskEntryMut <- { taskEntryMut with ExecutedAt = executedAt |> Some; TimeElapsed = timeElapsed |> Some; Status = statusCodeMeta |> snd; ExitCode = statusCodeMeta |> fst }
+    match statusCodeMeta with
+    | exitCode, "FAILED" when taskEntryMut.RetryCount > 0 && taskEntryMut.AttemptCount < taskEntryMut.RetryCount ->
+      let attemptCount = taskEntryMut.AttemptCount + 1
+      let runnableAt =  taskEntryMut |> getNextRunnableDate
+      taskEntryMut <- { taskEntryMut with AttemptCount = attemptCount; RunnableAt = runnableAt; Status = "QUEUED" }
       printfn "Task failed and is being requeued."
-    | "FAILED" ->
+    | exitCode, "FAILED" ->
       printfn "Task failed and is not being reattempted."
     | _ -> () // No action needed for other statuses
-    return if status = "FAILED" then 1 else 0
+    let n = data.updateTask (taskEntryMut, connection)
+    return statusCodeMeta |> fst
 }
 
 let updatePollingInterval (interval: int) =

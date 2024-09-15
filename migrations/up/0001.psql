@@ -13,6 +13,7 @@ CREATE TABLE TaskEntry (
   queue_name varchar(255) NOT NULL,
   type text NOT NULL,
   status varchar(50) NOT NULL,
+  exit_code int NULL,
   payload json NULL,
   valid_program_id uuid NOT NULL,
   created_at timestamp NOT NULL DEFAULT NOW(),
