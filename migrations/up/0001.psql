@@ -28,3 +28,11 @@ CREATE TABLE TaskEntry (
 CREATE INDEX idx_task_status ON TaskEntry(status);
 CREATE INDEX idx_task_queue_name ON TaskEntry(queue_name);
 CREATE INDEX idx_task_machine_name ON TaskEntry(machine_name);
+
+ALTER TABLE ValidProgram
+ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE 'UTC';
+
+ALTER TABLE TaskEntry
+ALTER COLUMN created_at TYPE timestamptz USING created_at AT TIME ZONE 'UTC',
+ALTER COLUMN runnable_at TYPE timestamptz USING runnable_at AT TIME ZONE 'UTC',
+ALTER COLUMN executed_at TYPE timestamptz USING executed_at AT TIME ZONE 'UTC';
