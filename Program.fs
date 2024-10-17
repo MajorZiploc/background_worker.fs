@@ -1,4 +1,5 @@
 open System
+open System.Text
 open System.Diagnostics
 open Acadian.FSharp
 open Newtonsoft.Json.Linq
@@ -137,6 +138,10 @@ let getNextRunnableDate (taskEntry: TaskEntry) =
   let actualDelay = min delay.TotalSeconds maxDelay.TotalSeconds |> TimeSpan.FromSeconds
   DateTime.UtcNow.Add(actualDelay)
 
+let stringToBase64 (input: string) =
+  let bytes = Encoding.UTF8.GetBytes(input)
+  Convert.ToBase64String(bytes)
+
 let parseTaskArgs (arguments: JObject option) =
   arguments
   |> Option.bind (fun args ->
@@ -145,7 +150,7 @@ let parseTaskArgs (arguments: JObject option) =
       let stringArgs =
         m |> Seq.map (function
           | :? JValue as v -> v.ToString() // Handle int, string, etc.
-          | obj -> sprintf "'%A'" (obj.ToString()) // Handle JObject or other types
+          | obj -> sprintf "%A" (obj.ToString() |> stringToBase64) // Handle JObject or other types
         )
         |> String.concat " "
       Some stringArgs
